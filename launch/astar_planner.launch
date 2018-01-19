@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="astar_planner" type="autonav" name="astar_planner" args="" output="screen" >
+    </node>
+</launch>
