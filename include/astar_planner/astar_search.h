@@ -1,7 +1,7 @@
 #ifndef ASTAR_NAVI_NODE_H
 #define ASTAR_NAVI_NODE_H
 
-//#define DEBUG 1
+#define DEBUG 1
 
 #include "astar_util.h"
 #include <ros/ros.h>
