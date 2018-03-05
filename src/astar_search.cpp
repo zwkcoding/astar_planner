@@ -730,7 +730,7 @@ void AstarSearch::broadcastPathTF()
     transform.setOrigin(tf::Vector3(path_.poses[i].pose.position.x, path_.poses[i].pose.position.y, path_.poses[i].pose.position.z));
     transform.setRotation(quat);
 
-    tf_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/map", "/astar_path"));
+    tf_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "odom", "/astar_path"));
 
     // sleep 0.1 [sec]
     usleep(100000);

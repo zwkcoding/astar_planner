@@ -13,6 +13,7 @@
   <depend>std_msgs</depend>
   <depend>tf</depend>
   <depend>opt_utils</depend>
+  <depend>internal_grid_map</depend>
 
   <export>
   </export>
