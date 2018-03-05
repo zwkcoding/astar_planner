@@ -1,4 +1,6 @@
 #include "astar_planner/astar_search.h"
+#include <unistd.h>  // usleep
+
 namespace astar_planner {
 
 AstarSearch::AstarSearch()
@@ -228,8 +230,9 @@ void AstarSearch::samplePathByStepLength(double step) {
         y1 = path_.poses.at(i).pose.position.y;
         x2 = path_.poses.at(i + 1).pose.position.x;
         y2 = path_.poses.at(i + 1).pose.position.y;
-        double t1 = tf::getYaw(path_.poses.at(i).pose.orientation);
-        double t2 = tf::getYaw(path_.poses.at(i + 1).pose.orientation);
+        double t1 = astar::modifyTheta(tf::getYaw(path_.poses.at(i).pose.orientation));
+        double t2 = astar::modifyTheta(tf::getYaw(path_.poses.at(i + 1).pose.orientation));
+        double delta_abs_t = astar::calcDiffOfRadian(t2, t1);
         double delta_t = t2 - t1;
         double delta_s = std::hypot(x2 - x1, y2 - y1);
         // straight line case
@@ -245,15 +248,15 @@ void AstarSearch::samplePathByStepLength(double step) {
         } else if (delta_t > 0) {
             // left turn
             // arc length
-            double R = delta_s / (sqrt(2*(1 - cos(delta_t))));
-            double l = R * delta_t;
+            double R = delta_s / (sqrt(2*(1 - cos(delta_abs_t))));  // no need to cal, R is a constant
+            double l = R * delta_abs_t;
             double center_x = x1 + cos(t1 + M_PI / 2.0)*R;
             double center_y = y1 + sin(t1 + M_PI / 2.0)*R;
             // delta arc length now becomes l
             double num = l / step;
             int size = static_cast<int>(num);
             for (int j = 0; j < size; j++) {
-                double heading = t1 + j*step / l * delta_t;
+                double heading = t1 + j*step / l * delta_abs_t;
                 ros_pose.pose.position.x = center_x + cos(heading - M_PI / 2.0)*R;
                 ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0)*R;
                 ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
@@ -263,8 +266,8 @@ void AstarSearch::samplePathByStepLength(double step) {
         } else {
             // right turn
             // arc length
-            double R = delta_s / (sqrt(2*(1 - cos(delta_t))));
-            double l = R * fabs(delta_t);
+            double R = delta_s / (sqrt(2*(1 - cos(delta_abs_t))));
+            double l = R * fabs(delta_abs_t);
             double center_x = x1 + cos(t1 - M_PI / 2.0)*R;
             double center_y = y1 + sin(t1 - M_PI / 2.0)*R;
             // delta arc length now becomes l
@@ -272,7 +275,7 @@ void AstarSearch::samplePathByStepLength(double step) {
             
             int size = static_cast<int>(num);
             for (int j = 0; j < size; j++) {
-                double heading = t1 + j*step / l * delta_t;
+                double heading = t1 + j*step / l * delta_abs_t;
                 ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0)*R;
                 ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0)*R;
                 ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
