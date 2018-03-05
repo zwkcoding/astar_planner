@@ -321,6 +321,7 @@ bool AstarSearch::detectCollision(const SimpleNode &sn)
   double cos_theta = std::cos(base_theta);
   double sin_theta = std::sin(base_theta);
 
+  // todo zwk
   // Convert each point to index and check if the node is Obstacle
   for (double x = left; x < right; x += resolution) {
     for (double y = top; y > bottom; y -= resolution) {
@@ -559,6 +560,7 @@ bool AstarSearch::search()
     // Terminate the search if the count reaches a certain value
     static int search_count = 0;
     search_count++;
+    // todo zwk
     if (search_count > 300000) {
       ROS_WARN("Exceed time limit");
       search_count = 0;
