@@ -1,6 +1,5 @@
 #include "astar_planner/astar_search.h"
 #include <unistd.h>  // usleep
-
 namespace astar_planner {
 
 AstarSearch::AstarSearch()
@@ -193,17 +192,6 @@ void AstarSearch::setPath(const SimpleNode &goal)
     ros_pose.header = header;
     path_.poses.push_back(ros_pose);
 
-    //----DEBUG-------
-    
-    /*debug_pose_array_.poses.push_back(ros_pose.pose);
-    int index_theta = node->theta / (2.0 * M_PI / angle_size_);
-    int index_x = node->x / map_info_.resolution;
-    int index_y = node->y / map_info_.resolution;
-    SimpleNode sn(index_x, index_y, index_theta, 0, 0);
-    */
-    //detectCollisionPose(sn);
-    //--------------
-
     // To the next node
     node = node->parent;
   }
@@ -267,7 +255,7 @@ void AstarSearch::samplePathByStepLength(double step) {
             // right turn
             // arc length
             double R = delta_s / (sqrt(2*(1 - cos(delta_abs_t))));
-            double l = R * fabs(delta_abs_t);
+            double l = R * delta_abs_t;
             double center_x = x1 + cos(t1 - M_PI / 2.0)*R;
             double center_y = y1 + sin(t1 - M_PI / 2.0)*R;
             // delta arc length now becomes l
@@ -690,9 +678,10 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
 {
   start_pose_local_.pose = start_pose;
   goal_pose_local_.pose  = goal_pose;
-
+  ros::WallTime begin = ros::WallTime::now();
   setMap(map);
-
+  ros::WallTime end = ros::WallTime::now();
+  std::cout << "set map time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
   if (!setStartNode()) {
     ROS_WARN("Invalid start pose!");
     return false;
@@ -711,14 +700,43 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
 // for debug
 void AstarSearch::publishPoseArray(const ros::Publisher &pub, const std::string &frame)
 {
+  // display astar node expanding process
   debug_pose_array_.header.frame_id = frame;
-  //debug_pose_array_.poses.push_back(map_info_.origin);
   debug_pose_array_.poses.push_back(start_pose_.pose);
   debug_pose_array_.poses.push_back(goal_pose_.pose);
 
   pub.publish(debug_pose_array_);
 
   debug_pose_array_.poses.clear();
+}
+
+void AstarSearch::publishFootPrint(const ros::Publisher &pub, const std::string &frame) {
+  // displayFootprint
+  visualization_msgs::Marker marker;
+  marker.header.frame_id = frame;
+  marker.header.stamp = ros::Time();
+  marker.ns = "footprint";
+  marker.id = 0;
+  marker.type = visualization_msgs::Marker::CUBE;
+  marker.action = visualization_msgs::Marker::ADD;
+
+  marker.scale.x = robot_length_;
+  marker.scale.y = robot_width_;
+  marker.scale.z = 2.0;
+  marker.color.a = 0.3;
+  marker.color.r = 0.0;
+  marker.color.g = 1.0;
+  marker.color.b = 0.0;
+  marker.frame_locked = true;
+
+  visualization_msgs::MarkerArray marker_array;
+  for (const auto &p : path_.poses)
+  {
+    marker.pose = p.pose;
+    marker_array.markers.push_back(marker);
+    marker.id += 1;
+  }
+  pub.publish(marker_array);
 }
 
 // for demo
@@ -735,8 +753,8 @@ void AstarSearch::broadcastPathTF()
 
     tf_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "odom", "/astar_path"));
 
-    // sleep 0.1 [sec]
-    usleep(100000);
+    // sleep 0.01 [sec]
+    usleep(1000000);
   }
 
 }

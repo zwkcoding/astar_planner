@@ -14,6 +14,7 @@
   <depend>tf</depend>
   <depend>opt_utils</depend>
   <depend>internal_grid_map</depend>
+  <depend>visualization_msgs</depend>
 
   <export>
   </export>

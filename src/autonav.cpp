@@ -97,6 +97,7 @@ int main(int argc, char **argv) {
     // ROS publishers
     ros::Publisher path_pub = n.advertise<nav_msgs::Path>("astar_path", 1, true);
     ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, true);
+    ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, true);
 
     ros::Rate loop_rate(10);
     while (ros::ok()) {
@@ -149,6 +150,7 @@ int main(int argc, char **argv) {
 
 #if DEBUG
             astar.publishPoseArray(debug_pose_pub, "odom");
+            astar.publishFootPrint(footprint_pub_, "odom");
             astar.broadcastPathTF();
 #endif
 

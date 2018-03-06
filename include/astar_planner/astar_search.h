@@ -10,6 +10,7 @@
 #include <nav_msgs/Path.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
+#include "visualization_msgs/MarkerArray.h"
 
 #include <iostream>
 #include <vector>
@@ -27,6 +28,7 @@ class AstarSearch
 
   //-- FOR DEBUG -------------------------
   void publishPoseArray(const ros::Publisher &pub, const std::string &frame);
+  void publishFootPrint(const ros::Publisher &pub, const std::string &frame);
   geometry_msgs::PoseArray debug_pose_array_;
   //--------------------------------------
 

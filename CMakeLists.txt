@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
         tf
         opt_utils
         internal_grid_map
+        visualization_msgs
         )
 find_package(OpenCV REQUIRED)
 
@@ -21,7 +22,7 @@ find_package(OpenCV REQUIRED)
 ###################################
 catkin_package(
         LIBRARIES hybrid_astar
-        CATKIN_DEPENDS roscpp std_msgs tf opt_utils internal_grid_map
+        CATKIN_DEPENDS roscpp std_msgs tf opt_utils internal_grid_map visualization_msgs
         DEPENDS OpenCV
 )
 
