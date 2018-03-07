@@ -7,10 +7,10 @@ AstarSearch::AstarSearch()
 {
   ros::NodeHandle private_nh_("~");
   private_nh_.param<bool>("use_2dnav_goal", use_2dnav_goal_, true);
-  private_nh_.param<std::string>("path_frame", path_frame_, "odom");
+  private_nh_.param<std::string>("path_frame", path_frame_, "/local_map/local_map");
   private_nh_.param<int>("angle_size", angle_size_, 48);
   private_nh_.param<double>("minimum_turning_radius", minimum_turning_radius_, 5);
-  private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 15);
+  private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 70);
   private_nh_.param<double>("goal_radius", goal_radius_, 0.3);
   private_nh_.param<double>("goal_angle", goal_angle_, 6.0);
   private_nh_.param<bool>("use_back", use_back_, false);
@@ -437,9 +437,10 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
   map_info_ = map.info;
 
   // TODO: what frame do we use?
-  std::string map_frame = "odom";
+  std::string map_frame = path_frame_;
   std::string ogm_frame = map.header.frame_id;
   // Set transform
+  // no need, cuz map_frame is static
   tf::StampedTransform map2ogm_frame;
   try
   {
@@ -468,7 +469,7 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
       int cost = map.data[og_index];
 
       // more than threshold or unknown area
-      if (cost > obstacle_threshold_/* || cost < 0 */) {
+      if (cost > obstacle_threshold_ || cost < 0 ) {
         nodes_[i][j][0].status = STATUS::OBS;
       }
       else
@@ -532,7 +533,12 @@ bool AstarSearch::setGoalNode()
 
   // Calculate wavefront heuristic cost
   if (use_wavefront_heuristic_) {
+    auto start = std::chrono::system_clock::now();
     bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
+    auto end = std::chrono::system_clock::now();
+    auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "wavefront_heuristic cost: " << usec / 1000.0 << '\n';
+
     if (!wavefront_result) {
       ROS_WARN("Goal is not reachable...");
       return false;
@@ -702,6 +708,7 @@ void AstarSearch::publishPoseArray(const ros::Publisher &pub, const std::string 
 {
   // display astar node expanding process
   debug_pose_array_.header.frame_id = frame;
+  debug_pose_array_.header.stamp = ros::Time();;
   debug_pose_array_.poses.push_back(start_pose_.pose);
   debug_pose_array_.poses.push_back(goal_pose_.pose);
 
@@ -751,7 +758,7 @@ void AstarSearch::broadcastPathTF()
     transform.setOrigin(tf::Vector3(path_.poses[i].pose.position.x, path_.poses[i].pose.position.y, path_.poses[i].pose.position.z));
     transform.setRotation(quat);
 
-    tf_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "odom", "/astar_path"));
+    tf_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(), path_frame_, "/astar_path"));
 
     // sleep 0.01 [sec]
     usleep(1000000);

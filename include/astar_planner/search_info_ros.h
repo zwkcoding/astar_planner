@@ -38,6 +38,7 @@ class SearchInfo
   geometry_msgs::PoseStamped goal_pose_global_;
   geometry_msgs::PoseStamped start_pose_local_;
   geometry_msgs::PoseStamped goal_pose_local_;
+  geometry_msgs::PoseStamped last_goal_pose_local_;
   // Transform which converts global frame (/map in Autoware) to OccupancyGrid frame
   tf::Transform ogm2map_;
   tf::TransformListener tf_listener_;
@@ -47,6 +48,9 @@ class SearchInfo
   bool map_set_;
   bool start_set_;
   bool goal_set_;
+
+  // update flag
+  bool goal_update_flag_;
 };
 
 #endif // SEARCH_INFO_ROS_H

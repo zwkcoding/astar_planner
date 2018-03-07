@@ -67,32 +67,16 @@ int main(int argc, char **argv) {
     astar_runtime << "index" << "t" << hmpl::endrow;
     int runtime_counter = 0;
     std::string map_topic;
-    private_nh_.param<std::string>("map_topic", map_topic, "grid_map");
+    private_nh_.param<std::string>("map_topic", map_topic, "/local_map/local_map");
 
-    std::string package_dir = ros::package::getPath("astar_planner");
-    std::string img_dir = "/obstacles.png";
-    cv::Mat img_src = cv::imread(package_dir + img_dir, CV_8UC1);
-    double resolution = 0.2;  // in meter
-    hmpl::InternalGridMap in_gm;
-    // set the 2d position of the center point of grid map in the grid map frame
-    in_gm.initializeFromImage(img_src, resolution, grid_map::Position::Zero());
-    in_gm.addObstacleLayerFromImage(img_src, 0.5);
-    in_gm.updateDistanceLayer();
-    in_gm.maps.setFrameId("odom");
-    ROS_INFO("Created map with size %f x %f m (%i x %i cells), map resolution is %f",
-             in_gm.maps.getLength().x(), in_gm.maps.getLength().y(),
-             in_gm.maps.getSize()(0), in_gm.maps.getSize()(1), in_gm.maps.getResolution());
-    // create map publisher
-    ros::Publisher map_publisher =
-            n.advertise<nav_msgs::OccupancyGrid>(map_topic, 1, true);
 
     AstarSearch astar;
     SearchInfo search_info;
 
     // ROS subscribers
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
-    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
-    ros::Subscriber goal_sub = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
+    ros::Subscriber start_sub = n.subscribe("/current_pos", 1, &SearchInfo::currentPoseCallback, &search_info);
+    ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
     ros::Publisher path_pub = n.advertise<nav_msgs::Path>("astar_path", 1, true);
@@ -103,17 +87,6 @@ int main(int argc, char **argv) {
     while (ros::ok()) {
         ros::spinOnce();
 
-        // Add data to grid map.
-        ros::Time time = ros::Time::now();
-        // publish the grid_map
-        in_gm.maps.setTimestamp(time.toNSec());
-        nav_msgs::OccupancyGrid message;
-        grid_map::GridMapRosConverter::toOccupancyGrid(
-                in_gm.maps, in_gm.obs, in_gm.FREE, in_gm.OCCUPY, message);
-        map_publisher.publish(message);
-//        ROS_INFO_THROTTLE(1.0, "Grid map (timestamp %f) published, origin position: (%f,%f)",
-//                          message.header.stamp.toSec(), message.info.origin.position.x,
-//                          message.info.origin.position.y);
 
         if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
             loop_rate.sleep();
@@ -138,19 +111,18 @@ int main(int argc, char **argv) {
 
         if (result) {
             if (runtime_counter < 101) {
-                astar_runtime << runtime_counter << msec << hmpl::endrow;
+//                astar_runtime << runtime_counter << msec << hmpl::endrow;
                 runtime_counter++;
             }
             ROS_INFO("Found GOAL!");
-            //publishPathAsWaypoints(waypoints_pub, astar.getPath(), waypoint_velocity_kmph);
             astar.samplePathByStepLength();
             path_pub.publish(astar.getDensePath());
-            saveStatePath(astar.getDensePath());
+//            saveStatePath(astar.getDensePath());
 
 
 #if DEBUG
             astar.publishPoseArray(debug_pose_pub, "odom");
-            astar.publishFootPrint(footprint_pub_, "odom");
+//            astar.publishFootPrint(footprint_pub_, "odom");
             astar.broadcastPathTF();
 #endif
 
