@@ -77,9 +77,11 @@ int main(int argc, char **argv) {
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
     ros::Subscriber start_sub = n.subscribe("/current_pos", 1, &SearchInfo::currentPoseCallback, &search_info);
     ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
+//    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
+//    ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
-    ros::Publisher path_pub = n.advertise<nav_msgs::Path>("astar_path", 1, true);
+    ros::Publisher path_pub = n.advertise<nav_msgs::Path>("/global_path", 1, true);
     ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, true);
     ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, true);
 
@@ -115,15 +117,20 @@ int main(int argc, char **argv) {
                 runtime_counter++;
             }
             ROS_INFO("Found GOAL!");
+            auto start = std::chrono::system_clock::now();
             astar.samplePathByStepLength();
+            auto end = std::chrono::system_clock::now();
+            auto msec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
+//            ROS_INFO("sampling path msec: %lf", msec);
+
             path_pub.publish(astar.getDensePath());
 //            saveStatePath(astar.getDensePath());
 
 
 #if DEBUG
             astar.publishPoseArray(debug_pose_pub, "odom");
-//            astar.publishFootPrint(footprint_pub_, "odom");
-            astar.broadcastPathTF();
+            astar.publishFootPrint(footprint_pub_, "odom");
+//            astar.broadcastPathTF();
 #endif
 
         } else {
@@ -131,9 +138,7 @@ int main(int argc, char **argv) {
 
 #if DEBUG
             astar.publishPoseArray(debug_pose_pub, "odom"); // debug
-            path_pub.publish(astar.getPath());
 #endif
-
         }
 
         astar.reset();

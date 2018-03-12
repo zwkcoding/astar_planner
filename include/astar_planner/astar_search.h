@@ -11,6 +11,7 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include "visualization_msgs/MarkerArray.h"
+#include "internal_grid_map/internal_grid_map.hpp"
 
 #include <iostream>
 #include <vector>
@@ -38,6 +39,7 @@ class AstarSearch
   nav_msgs::Path getPath() {return path_;}
   nav_msgs::Path getDensePath() {return dense_path_;}
   void samplePathByStepLength(double step = 0.1);
+
  private:
   bool search();
   void resizeNode(int width, int height, int angle_size);
@@ -54,7 +56,32 @@ class AstarSearch
   bool detectCollision(const SimpleNode &sn);
   bool calcWaveFrontHeuristic(const SimpleNode &sn);
   bool detectCollisionWaveFront(const WaveFrontNode &sn);
+  bool findValidClosePose(const grid_map::GridMap& grid_map,
+                          const std::string dis_layer_name,
+                          const grid_map::Index& start_index,
+                          grid_map::Index& adjusted_index,
+                          const float required_final_distance,
+                          const float desired_final_distance);
+  void touchDistanceField(const grid_map::Matrix& dist_trans_map,
+                          const grid_map::Index& current_point,
+                          const int idx_x,
+                          const int idx_y,
+                          float& highest_val,
+                          grid_map::Index& highest_index)
+  {
+//    //If no valid expl transform data, return
+//    if (dist_trans_map(idx_x, idx_y) == std::numeric_limits<float>::max())
+//      return;
 
+    float this_delta = dist_trans_map(idx_x, idx_y) - dist_trans_map(current_point(0),current_point(1));
+
+    if ( (this_delta > 0.0f) && (this_delta > highest_val) ){
+      highest_val = this_delta;
+      highest_index = grid_map::Index(idx_x, idx_y);
+    }
+  }
+  //
+  void clearArea( int xCenter,  int yCenter);
   // ROS param
   std::string path_frame_;        // publishing path frame
   int angle_size_;                // descritized angle size
@@ -96,7 +123,13 @@ class AstarSearch
   nav_msgs::Path path_;
   // Dense path
   nav_msgs::Path dense_path_;
-  
+
+  // gridmap
+  hmpl::InternalGridMap igm_;
+  ros::Publisher ogm_pub_;
+
+
+
 };
 
 }

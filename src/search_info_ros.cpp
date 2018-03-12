@@ -45,8 +45,26 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
   if (!map_set_)
     return;
 
+  ROS_INFO("Subcscribed current pose!");
+
+  std::string global_frame  = "odom";
+  std::string goal_frame  = msg->header.frame_id;
+
+  // Get transform (map to world in Autoware)
+  tf::StampedTransform world2map;
+  try
+  {
+    tf_listener_.lookupTransform(global_frame, goal_frame, ros::Time(0), world2map);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s", ex.what());
+    return;
+  }
+  // Set pose in Global frame
+  geometry_msgs::Pose msg_pose = msg->pose.pose;
   start_pose_global_.header = msg->header;
-  start_pose_global_.pose   = msg->pose.pose;
+  start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_local_.pose    = astar::transformPose(start_pose_global_.pose, ogm2map_);
   start_pose_local_.header  = start_pose_global_.header;
   
@@ -63,7 +81,7 @@ void SearchInfo::currentPoseCallback(const geometry_msgs::PoseStampedConstPtr &m
   if (!map_set_)
     return;
 
-  ROS_INFO("Subcscribed current pose!");
+//  ROS_INFO("Subcscribed current pose!");
 
   std::string global_frame  = "odom";
   std::string goal_frame  = msg->header.frame_id;
@@ -100,7 +118,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   if (!map_set_)
     return;
 
-  ROS_INFO("Subcscribed goal pose!");
+//  ROS_INFO("Subcscribed goal pose!");
 
   // TODO: what frame do we use?
   std::string global_frame  = "odom";
@@ -124,6 +142,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   goal_pose_global_.header = msg->header;
   // first time receive goal command or arrived last goal
   if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
+    ROS_INFO("Update goal pose!");
     goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
     goal_pose_local_.header = goal_pose_global_.header;
     last_goal_pose_local_ = goal_pose_local_;

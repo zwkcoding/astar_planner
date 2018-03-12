@@ -5,14 +5,15 @@ namespace astar_planner {
 AstarSearch::AstarSearch()
   : node_initialized_(false)
 {
+
   ros::NodeHandle private_nh_("~");
   private_nh_.param<bool>("use_2dnav_goal", use_2dnav_goal_, true);
-  private_nh_.param<std::string>("path_frame", path_frame_, "/local_map/local_map");
+  private_nh_.param<std::string>("path_frame", path_frame_, "odom");
   private_nh_.param<int>("angle_size", angle_size_, 48);
   private_nh_.param<double>("minimum_turning_radius", minimum_turning_radius_, 5);
   private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 70);
-  private_nh_.param<double>("goal_radius", goal_radius_, 0.3);
-  private_nh_.param<double>("goal_angle", goal_angle_, 6.0);
+  private_nh_.param<double>("goal_radius", goal_radius_, 2);
+  private_nh_.param<double>("goal_angle", goal_angle_, 180.0);
   private_nh_.param<bool>("use_back", use_back_, false);
   private_nh_.param<double>("robot_length", robot_length_, 4.9);
   private_nh_.param<double>("robot_width", robot_width_, 2.8);
@@ -20,9 +21,11 @@ AstarSearch::AstarSearch()
   private_nh_.param<double>("curve_weight", curve_weight_, 1.05);
   private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
   private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
-  private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
 
   createStateUpdateTable(angle_size_);
+
+//  ogm_pub_ = private_nh_.advertise<nav_msgs::OccupancyGrid>("ogm_map", 1, true);
+
 }
 
 AstarSearch::~AstarSearch()
@@ -263,7 +266,7 @@ void AstarSearch::samplePathByStepLength(double step) {
             
             int size = static_cast<int>(num);
             for (int j = 0; j < size; j++) {
-                double heading = t1 + j*step / l * delta_abs_t;
+                double heading = t1 - j*step / l * delta_abs_t;
                 ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0)*R;
                 ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0)*R;
                 ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
@@ -379,6 +382,7 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
         continue;
 
       // Take the size of robot into account
+      // time costy when large free space
       if (detectCollisionWaveFront(next))
         continue;
 
@@ -411,15 +415,170 @@ bool AstarSearch::detectCollisionWaveFront(const WaveFrontNode &ref)
       int index_x = (robot_x + x) / map_info_.resolution;
       int index_y = (robot_y + y) / map_info_.resolution;
 
-      if (isOutOfRange(index_x, index_y))
+      if (isOutOfRange(index_x, index_y)) {
+//        ROS_INFO("out of range");
         return true;
+      }
 
-      if (nodes_[index_y][index_x][0].status == STATUS::OBS)
+      if (nodes_[index_y][index_x][0].status == STATUS::OBS) {
+//        ROS_INFO("state is obs");
         return true;
+      }
     }
   }
 
   return false;
+}
+
+bool AstarSearch::findValidClosePose(const grid_map::GridMap& grid_map,
+                                     const std::string dis_layer_name,
+                                     const grid_map::Index& start_index,
+                                     grid_map::Index& adjusted_index,
+                                     const float required_final_distance,
+                                     const float desired_final_distance) {
+  grid_map::Index current_index;
+  grid_map::Index next_index;
+  current_index = start_index;
+  std::vector <grid_map::Index> path_indices;
+  path_indices.push_back(current_index);
+  const grid_map::Matrix& dist_data = grid_map[dis_layer_name];
+
+  float dist_from_goal = 0.0f;
+  float dist_from_obstacle = dist_data(current_index(0), current_index(1));
+
+  if (dist_from_obstacle >= desired_final_distance){
+    ROS_INFO("Pose already farther than desired distance from next obstacle, not modifying");
+    adjusted_index = start_index;
+    return true;
+  }
+
+  bool abort = false;
+  while(!abort)
+  {
+
+    // We guarantee in construction of expl. transform that we're not
+    // at the border.
+    //if (point(0) < 1 || point(0) >= size_x_lim ||
+    //    point(1) < 1 || point(1) >= size_y_lim){
+    //    continue;
+    //}
+
+    //std::cout << "\nStartloop curr_index:\n" << current_index << "\nval: " << expl_data(current_index(0), current_index(1)) << "\n";
+
+
+
+    float highest_cost = 0.0f;
+
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)-1,
+                       current_index(1),
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0),
+                       current_index(1)-1,
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0),
+                       current_index(1)+1,
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)+1,
+                       current_index(1),
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)-1,
+                       current_index(1)-1,
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)-1,
+                       current_index(1)+1,
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)+1,
+                       current_index(1)-1,
+                       highest_cost,
+                       next_index);
+
+    touchDistanceField(dist_data,
+                       current_index,
+                       current_index(0)+1,
+                       current_index(1)+1,
+                       highest_cost,
+                       next_index);
+
+
+    dist_from_obstacle = dist_data(current_index(0), current_index(1));
+
+    //std::cout << "curr_index: " << current_index << "\ndist_from_obstacle: " << dist_from_obstacle << "dist_from_start: " << dist_from_start << " highest cost: " << highest_cost << "\n";
+
+    // If gradient could not be followed..
+    if (highest_cost == 0.0f){
+
+      //std::cout << "curr_index: " << current_index << "\nval: " << dist_data(current_index(0), current_index(1)) << "dist_from_start: " << dist_from_start << " highest cost: " << highest_cost << "\n";
+
+      //ROS_INFO_STREAM("Reached end of distance transform with dist_from_start)
+
+      // Could not reach enough clearance
+      if (dist_from_obstacle < required_final_distance){
+        ROS_WARN("Could not find gradient of distance transform leading to free area, returning original pose");
+        adjusted_index = start_index;
+        return false;
+
+        // Could not reach desired distance from obstacles, but enough clearance
+      }else if (dist_from_obstacle < desired_final_distance){
+        ROS_WARN("Could not find gradient of distance transform reaching desired final distance");
+        abort = true;
+
+      }else{
+        ROS_INFO("Reached final distance");
+        abort = true;
+      }
+
+      // Gradient following worked
+    }else{
+
+      //dist_from_start += highest_cost;
+
+      // If desired distance exceeded, stop here
+      if (dist_from_obstacle > desired_final_distance){
+        abort = true;
+
+        // Otherwise continue gradient following
+      }else{
+
+        current_index = next_index;
+        dist_from_goal += highest_cost;
+        path_indices.push_back(current_index);
+      }
+    }
+  }
+
+  adjusted_index = current_index;
+
+
+  return true;
+
+
 }
 
 void AstarSearch::reset()
@@ -432,6 +591,34 @@ void AstarSearch::reset()
   std::swap(openlist_, empty);
 }
 
+void AstarSearch::clearArea( int xCenter,  int yCenter) {
+
+  int radius = ceil(robot_width_ / map_info_.resolution);
+
+  int vx[2], vy[2];
+  for(int x = xCenter - radius; x <= xCenter; ++x)
+    for(int y = yCenter - radius; y <= yCenter; ++y)
+      if(1/*(x - xCenter)*(x - xCenter) + (y - yCenter)*(y - yCenter) <= radius*radius*/)
+      {
+        vx[0] = x;
+        vy[0] = y;
+        vx[1] = xCenter - (x - xCenter);
+        vy[1] = yCenter - (y - yCenter);
+
+        for(int i=0; i<2; ++i)
+          for(int j=0; j<2; ++j)
+          {
+            int m = vx[i], n = vy[j];
+            for (int k = 0; k < angle_size_; k++) {
+              //nodes_[i][j][k].gc     = 0;
+              nodes_[n][m][k].hc     = 0;
+              nodes_[n][m][k].status = STATUS::NONE;
+              nodes_[n][m][k].parent = NULL;
+            }
+          }
+      }
+
+}
 void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
 {
   map_info_ = map.info;
@@ -460,7 +647,22 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
   if (!node_initialized_) {
     resizeNode(map.info.width, map.info.height, angle_size_);
     node_initialized_ = true;
+    const double lengthX = map.info.resolution * map.info.height;
+    const double lengthY = map.info.resolution * map.info.width;
+    grid_map::Length length(lengthX, lengthY);
+    igm_.maps.setGeometry(length, map.info.resolution, grid_map::Position::Zero());
+    igm_.maps.setFrameId(map.header.frame_id);
   }
+  ros::WallTime begin = ros::WallTime::now();
+
+  // from occupancy to gridmap
+  bool success = grid_map::GridMapRosConverter::fromOccupancyGrid(map, igm_.obs, igm_.maps);
+  if(!success) {
+    ROS_ERROR("fail to create gridmap");
+  }
+//  igm_.updateDistanceLayerCV();
+//  ros::WallTime end = ros::WallTime::now();
+//  std::cout << "gridmap process time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
 
   for (size_t i = 0; i < map.info.height; i++) {
     for (size_t j = 0; j < map.info.width; j++) {
@@ -524,12 +726,42 @@ bool AstarSearch::setGoalNode()
   int index_y;
   int index_theta;
   poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
-
+  auto start = std::chrono::system_clock::now();
+  clearArea(index_x, index_y);
+  auto end = std::chrono::system_clock::now();
+  auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+//  std::cout << "clear goal neighber cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
   SimpleNode goal_sn(index_x, index_y, index_theta, 0, 0);
 
+//  grid_map::Index current_index;
+
+//  if (!igm_.maps.getIndex(grid_map::Position(goal_pose_local_.pose.position.x + map_info_.origin.position.x,
+//                                             goal_pose_local_.pose.position.y + map_info_.origin.position.y),current_index)){
+//    ROS_WARN("goal index not in map");
+//    return false;
+//  }
+
   // Check if goal is valid
-  if (isOutOfRange(index_x, index_y) || detectCollision(goal_sn))
+  if (isOutOfRange(index_x, index_y) /*|| detectCollision(goal_sn)*/)
     return false;
+//  if(detectCollision(goal_sn)) {
+//    ROS_INFO("goal Pose invalid, modifying");
+//    grid_map::Index adjusted_index;
+//    findValidClosePose(igm_.maps, igm_.dis, current_index, adjusted_index, 3, 6);
+//    grid_map::Position adjusted_position;
+//
+//    igm_.maps.getPosition(adjusted_index, adjusted_position);
+//
+//    goal_pose_local_.pose.position.x = adjusted_position[0] - map_info_.origin.position.x;
+//    goal_pose_local_.pose.position.y = adjusted_position[1] - map_info_.origin.position.y;
+//    poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
+//    goal_sn.index_x = index_x;
+//    goal_sn.index_y = index_y;
+//    ROS_INFO("Adjusted goal pose :%f, %f ",goal_pose_local_.pose.position.x, goal_pose_local_.pose.position.y);
+//
+//  } else {
+//    ROS_INFO("goal Pose valid, not modifying");
+//  }
 
   // Calculate wavefront heuristic cost
   if (use_wavefront_heuristic_) {
@@ -537,7 +769,7 @@ bool AstarSearch::setGoalNode()
     bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
     auto end = std::chrono::system_clock::now();
     auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    std::cout << "wavefront_heuristic cost: " << usec / 1000.0 << '\n';
+//    std::cout << "wavefront cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
     if (!wavefront_result) {
       ROS_WARN("Goal is not reachable...");
@@ -552,15 +784,15 @@ bool AstarSearch::search()
 {
   // -- Start Astar search ----------
   // If the openlist is empty, search failed
+  ros::WallTime begin = ros::WallTime::now();
   while (!openlist_.empty()) {
 
     // Terminate the search if the count reaches a certain value
-    static int search_count = 0;
-    search_count++;
-    // todo zwk
-    if (search_count > 300000) {
+    ros::WallTime end = ros::WallTime::now();
+    float elapse_time = (end - begin).toSec() * 1000;
+    if(elapse_time > 500) {
       ROS_WARN("Exceed time limit");
-      search_count = 0;
+      std::cout << "Exceed time limit: " << (end - begin).toSec() * 1000 << "[ms]" << '\n';
       return false;
     }
 
@@ -620,7 +852,6 @@ bool AstarSearch::search()
 
       // GOAL CHECK
       if (isGoal(next_x, next_y, next_theta)) {
-        search_count = 0;
         next_node->status = STATUS::OPEN;
         next_node->x      = next_x;
         next_node->y      = next_y;
@@ -668,9 +899,6 @@ bool AstarSearch::search()
         }
       }
 
-      if (search_count == 0)
-        break;
-
     } // state update
 
   }
@@ -687,7 +915,7 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
   ros::WallTime begin = ros::WallTime::now();
   setMap(map);
   ros::WallTime end = ros::WallTime::now();
-  std::cout << "set map time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
+//  std::cout << "set map time: " << (end - begin).toSec() * 1000 << "[ms]" << '\n';
   if (!setStartNode()) {
     ROS_WARN("Invalid start pose!");
     return false;
@@ -697,8 +925,11 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
     ROS_WARN("Invalid goal pose!");
     return false;
   }
-
+  auto start = std::chrono::system_clock::now();
   bool result = search();
+  auto end0 = std::chrono::system_clock::now();
+  auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start).count();
+//  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
   return result;
 }
