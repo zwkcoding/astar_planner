@@ -7,14 +7,13 @@ AstarSearch::AstarSearch()
 {
 
   ros::NodeHandle private_nh_("~");
-  private_nh_.param<bool>("use_2dnav_goal", use_2dnav_goal_, true);
-  private_nh_.param<std::string>("path_frame", path_frame_, "odom");
+  private_nh_.param<std::string>("path_frame", path_frame_, "/odom");
   private_nh_.param<int>("angle_size", angle_size_, 48);
   private_nh_.param<double>("minimum_turning_radius", minimum_turning_radius_, 5);
   private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 70);
   private_nh_.param<double>("goal_radius", goal_radius_, 2);
-  private_nh_.param<double>("goal_angle", goal_angle_, 180.0);
-  private_nh_.param<bool>("use_back", use_back_, false);
+  private_nh_.param<double>("goal_angle", goal_angle_, 10.0); // unit: degree
+  private_nh_.param<bool>("use_back", use_back_, true);
   private_nh_.param<double>("robot_length", robot_length_, 4.9);
   private_nh_.param<double>("robot_width", robot_width_, 2.8);
   private_nh_.param<double>("base2back", base2back_, 1.09);
@@ -23,8 +22,6 @@ AstarSearch::AstarSearch()
   private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
 
   createStateUpdateTable(angle_size_);
-
-//  ogm_pub_ = private_nh_.advertise<nav_msgs::OccupancyGrid>("ogm_map", 1, true);
 
 }
 
@@ -193,6 +190,14 @@ void AstarSearch::setPath(const SimpleNode &goal)
     geometry_msgs::PoseStamped ros_pose;
     tf::poseTFToMsg(tf_pose, ros_pose.pose);
     ros_pose.header = header;
+    // use pose.position.z to represent back or forward
+    // -1 --> back; 1 --> forward
+    if(node->back = true) {
+      ros_pose.pose.position.z = -1;
+    } else {
+      ros_pose.pose.position.z = 1;
+    }
+
     path_.poses.push_back(ros_pose);
 
     // To the next node
@@ -226,6 +231,8 @@ void AstarSearch::samplePathByStepLength(double step) {
         double delta_abs_t = astar::calcDiffOfRadian(t2, t1);
         double delta_t = t2 - t1;
         double delta_s = std::hypot(x2 - x1, y2 - y1);
+        // transfer z(back or forward dir)
+        ros_pose.pose.position.z = path_.poses.at(i).pose.position.z;
         // straight line case
         if (delta_t == 0) {
             // calculate how many points need to be inserted by step
@@ -585,6 +592,8 @@ void AstarSearch::reset()
 {
   // Clear path
   path_.poses.clear();
+  // clear dense path
+  dense_path_.poses.clear();
 
   // Clear queue
   std::priority_queue<SimpleNode, std::vector<SimpleNode>, std::greater<SimpleNode>> empty;

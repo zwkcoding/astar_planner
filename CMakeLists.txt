@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
         opt_utils
         internal_grid_map
         visualization_msgs
+        control_msgs
         )
 find_package(OpenCV REQUIRED)
 

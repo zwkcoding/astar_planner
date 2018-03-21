@@ -4,6 +4,7 @@
 #include "astar_util.h"
 
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <tf/transform_listener.h>
@@ -19,7 +20,7 @@ class SearchInfo
   void mapCallback(const nav_msgs::OccupancyGridConstPtr &msg);
   void startCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   void goalCallback(const geometry_msgs::PoseStampedConstPtr &msg);
-  void currentPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg);
+  void currentPoseCallback(const nav_msgs::OdometryConstPtr &msg);
 
   // get method
   bool getMapSet() {return map_set_;}
@@ -31,6 +32,9 @@ class SearchInfo
 
   // Reset flags
   void reset();
+
+  // update flag
+  bool goal_update_flag_;
 
  private:
   nav_msgs::OccupancyGrid map_;
@@ -49,8 +53,7 @@ class SearchInfo
   bool start_set_;
   bool goal_set_;
 
-  // update flag
-  bool goal_update_flag_;
+
 };
 
 #endif // SEARCH_INFO_ROS_H

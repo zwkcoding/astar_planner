@@ -47,7 +47,7 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
 
   ROS_INFO("Subcscribed current pose!");
 
-  std::string global_frame  = "odom";
+  std::string global_frame  = "/odom";
   std::string goal_frame  = msg->header.frame_id;
 
   // Get transform (map to world in Autoware)
@@ -68,7 +68,7 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
   start_pose_local_.pose    = astar::transformPose(start_pose_global_.pose, ogm2map_);
   start_pose_local_.header  = start_pose_global_.header;
   
-  start_pose_global_.header.frame_id = "odom";
+  start_pose_global_.header.frame_id = "/odom";
   start_pose_global_.header.stamp = ros::Time::now();
   start_pose_local_.header = start_pose_global_.header;
   
@@ -76,14 +76,14 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
 }
 
 
-void SearchInfo::currentPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg)
+void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
 {
   if (!map_set_)
     return;
 
 //  ROS_INFO("Subcscribed current pose!");
 
-  std::string global_frame  = "odom";
+  std::string global_frame  = "/odom";
   std::string goal_frame  = msg->header.frame_id;
 
    // Get transform (map to world in Autoware)
@@ -98,14 +98,14 @@ void SearchInfo::currentPoseCallback(const geometry_msgs::PoseStampedConstPtr &m
       return;
   }
     // Set pose in Global frame
-  geometry_msgs::Pose msg_pose = msg->pose;
+  geometry_msgs::Pose msg_pose = msg->pose.pose;
   start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_global_.header = msg->header;
   start_pose_local_.pose = astar::transformPose(start_pose_global_.pose, ogm2map_);
   start_pose_local_.header = start_pose_local_.header;
   if(!last_goal_pose_local_.header.frame_id.empty()) {
-    if ((std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
-         + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2) < 1)) {
+    if (sqrt(std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
+         + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 3) {
       goal_update_flag_ = true;
     }
   }
@@ -121,7 +121,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 //  ROS_INFO("Subcscribed goal pose!");
 
   // TODO: what frame do we use?
-  std::string global_frame  = "odom";
+  std::string global_frame  = "/odom";
   std::string goal_frame  = msg->header.frame_id;
 
   // Get transform (map to world in Autoware)
