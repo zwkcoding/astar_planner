@@ -10,6 +10,7 @@
 #include <control_msgs/Traj_Node.h>
 #include <control_msgs/Trajectory.h>
 
+//#define Time_Profile
 
 #include <ros/package.h>
 
@@ -66,9 +67,12 @@ int main(int argc, char **argv) {
     ros::NodeHandle n;
     ros::NodeHandle private_nh_("~");
 
+#ifdef Time_Profile
     hmpl::CSVFile astar_runtime("astar_runtime.csv");
     astar_runtime << "index" << "t" << hmpl::endrow;
     int runtime_counter = 0;
+#endif
+
     std::string map_topic;
     private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
 
@@ -100,7 +104,6 @@ int main(int argc, char **argv) {
 
         // Reset flag
         search_info.reset();
-//        std::cout << "search times:" << runtime_counter << std::endl;
 
         // new next goal received and not reached
         if(search_info.goal_update_flag_ == false && search_info.getGoalSet()) {
@@ -114,10 +117,7 @@ int main(int argc, char **argv) {
             ROS_INFO_THROTTLE(1, "astar msec: %lf", msec);
 
             if (result) {
-                if (runtime_counter < 101) {
-//                astar_runtime << runtime_counter << msec << hmpl::endrow;
-                    runtime_counter++;
-                }
+
                 ROS_INFO_THROTTLE(1, "Found GOAL!");
                 // sample path by constant length
                 astar.samplePathByStepLength();
@@ -141,9 +141,13 @@ int main(int argc, char **argv) {
                 }
 
                 trajectory_pub.publish(trajectory);
-
-//            saveStatePath(astar.getDensePath());
-
+#ifdef Time_Profile
+                if (runtime_counter < 101) {
+                    astar_runtime << runtime_counter << msec << hmpl::endrow;
+                    runtime_counter++;
+                }
+                saveStatePath(astar.getDensePath());
+#endif
 
 #if DEBUG
                 astar.publishPoseArray(debug_pose_pub, "/odom");
