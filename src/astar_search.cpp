@@ -192,7 +192,7 @@ void AstarSearch::setPath(const SimpleNode &goal)
     ros_pose.header = header;
     // use pose.position.z to represent back or forward
     // -1 --> back; 1 --> forward
-    if(node->back = true) {
+    if(true == node->back) {
       ros_pose.pose.position.z = -1;
     } else {
       ros_pose.pose.position.z = 1;
