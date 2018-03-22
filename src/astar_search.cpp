@@ -15,12 +15,16 @@ AstarSearch::AstarSearch()
   private_nh_.param<double>("goal_angle", goal_angle_, 10.0); // unit: degree
   private_nh_.param<bool>("use_back", use_back_, true);
   private_nh_.param<double>("robot_length", robot_length_, 4.9);
+  private_nh_.param<double>("robot_wheelbase", robot_wheelbase_, 2.84);
   private_nh_.param<double>("robot_width", robot_width_, 2.8);
   private_nh_.param<double>("base2back", base2back_, 1.09);
   private_nh_.param<double>("curve_weight", curve_weight_, 1.05);
   private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
   private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
 
+    // initial car geometry parameters
+  InitCarGeometry(car_);
+    // product motion primitive look-up table
   createStateUpdateTable(angle_size_);
 
 }
@@ -48,9 +52,7 @@ void AstarSearch::poseToIndex(const geometry_msgs::Pose &pose, int *index_x, int
 
   tf::Quaternion quat;
   tf::quaternionMsgToTF(pose.orientation, quat);
-  double yaw = tf::getYaw(quat);
-  if (yaw < 0)
-    yaw += 2 * M_PI;
+  double yaw = astar::modifyTheta(tf::getYaw(quat));
 
   // Descretize angle
   static double one_angle_range = 2 * M_PI / angle_size_;
@@ -192,7 +194,7 @@ void AstarSearch::setPath(const SimpleNode &goal)
     ros_pose.header = header;
     // use pose.position.z to represent back or forward
     // -1 --> back; 1 --> forward
-    if(node->back = true) {
+    if(true == node->back) {
       ros_pose.pose.position.z = -1;
     } else {
       ros_pose.pose.position.z = 1;
@@ -390,6 +392,7 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
 
       // Take the size of robot into account
       // time costy when large free space
+
       if (detectCollisionWaveFront(next))
         continue;
 
@@ -412,29 +415,51 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
 // Simple collidion detection for wavefront search
 bool AstarSearch::detectCollisionWaveFront(const WaveFrontNode &ref)
 {
-  // Define the robot as square
-  static double half = robot_width_ / 2;
-  double robot_x = ref.index_x * map_info_.resolution;
-  double robot_y = ref.index_y * map_info_.resolution;
-
-  for (double y = half; y > -1.0 * half; y -= map_info_.resolution) {
-    for (double x = -1.0 * half; x < half; x += map_info_.resolution) {
-      int index_x = (robot_x + x) / map_info_.resolution;
-      int index_y = (robot_y + y) / map_info_.resolution;
-
-      if (isOutOfRange(index_x, index_y)) {
-//        ROS_INFO("out of range");
+    hmpl::State current;
+    // convert to ogm: origin(0,0) is on center
+    getOdomCoordinates(current.x, current.y, ref.index_x, ref.index_y);
+    // Define the robot as square
+    // todo
+    grid_map::Position pos(current.x, current.y);
+    if (this->igm_.maps.isInside(pos)) {
+        double clearance = this->igm_.getObstacleDistance(pos);
+        if (clearance < robot_width_ / 2) {
+            // the big circle is not collision-free, then do an exact
+            // collision checking
+            return true;
+        } else { // collision-free
+            return false;
+        }
+    } else {  // beyond the map boundary
         return true;
-      }
-
-      if (nodes_[index_y][index_x][0].status == STATUS::OBS) {
-//        ROS_INFO("state is obs");
-        return true;
-      }
     }
-  }
 
-  return false;
+    // use iterate
+   if(0) {
+       // Define the robot as square
+       static double half = robot_width_ / 2;
+       double robot_x = ref.index_x * map_info_.resolution;
+       double robot_y = ref.index_y * map_info_.resolution;
+
+       for (double y = half; y > -1.0 * half; y -= map_info_.resolution) {
+           for (double x = -1.0 * half; x < half; x += map_info_.resolution) {
+               int index_x = (robot_x + x) / map_info_.resolution;
+               int index_y = (robot_y + y) / map_info_.resolution;
+
+               if (isOutOfRange(index_x, index_y)) {
+//        ROS_INFO("out of range");
+                   return true;
+               }
+
+               if (nodes_[index_y][index_x][0].status == STATUS::OBS) {
+//        ROS_INFO("state is obs");
+                   return true;
+               }
+           }
+       }
+
+       return false;
+   }
 }
 
 bool AstarSearch::findValidClosePose(const grid_map::GridMap& grid_map,
@@ -602,6 +627,7 @@ void AstarSearch::reset()
 
 void AstarSearch::clearArea( int xCenter,  int yCenter) {
 
+    // todo use
   int radius = ceil(robot_width_ / map_info_.resolution);
 
   int vx[2], vy[2];
@@ -656,21 +682,36 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
   if (!node_initialized_) {
     resizeNode(map.info.width, map.info.height, angle_size_);
     node_initialized_ = true;
-    const double lengthX = map.info.resolution * map.info.height;
-    const double lengthY = map.info.resolution * map.info.width;
-    grid_map::Length length(lengthX, lengthY);
-    igm_.maps.setGeometry(length, map.info.resolution, grid_map::Position::Zero());
-    igm_.maps.setFrameId(map.header.frame_id);
   }
-  ros::WallTime begin = ros::WallTime::now();
 
+  ros::WallTime begin = ros::WallTime::now();
+  grid_map::GridMapRosConverter::fromOccupancyGrid(map, igm_.obs, igm_.maps);
   // from occupancy to gridmap
-  bool success = grid_map::GridMapRosConverter::fromOccupancyGrid(map, igm_.obs, igm_.maps);
-  if(!success) {
-    ROS_ERROR("fail to create gridmap");
+  // value replacement
+  grid_map::Matrix& grid_data = igm_.maps[igm_.obs];
+  size_t size_x = igm_.maps.getSize()(0);
+  size_t size_y = igm_.maps.getSize()(1);
+  // pre-process
+  // 0 : obstacle/unknown
+  // 255 : free
+  for (size_t idx_x = 0; idx_x < size_x; ++idx_x){
+    for (size_t idx_y = 0; idx_y < size_y; ++idx_y) {
+      if (0.0 == grid_data(idx_x, idx_y)) {
+        grid_data(idx_x, idx_y) = igm_.FREE;
+      } else if(100.0 == grid_data(idx_x, idx_y)) {
+        grid_data(idx_x, idx_y) = igm_.OCCUPY;
+      } else {
+          // view unknown as obstacle
+          grid_data(idx_x, idx_y) = igm_.OCCUPY;
+      }
+    }
   }
-//  igm_.updateDistanceLayerCV();
-//  ros::WallTime end = ros::WallTime::now();
+
+  ROS_DEBUG("Created map with size %f x %f m (%i x %i cells).",
+           igm_.maps.getLength().x(), igm_.maps.getLength().y(),
+           igm_.maps.getSize()(0), igm_.maps.getSize()(1));
+  igm_.updateDistanceLayerCV();
+  ros::WallTime end = ros::WallTime::now();
 //  std::cout << "gridmap process time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
 
   for (size_t i = 0; i < map.info.height; i++) {
@@ -708,7 +749,7 @@ bool AstarSearch::setStartNode()
   SimpleNode start_sn(index_x, index_y, index_theta, 0, 0);
 
   // Check if start is valid
-  if (isOutOfRange(index_x, index_y) || detectCollision(start_sn))
+  if (isOutOfRange(index_x, index_y) || !isSingleStateCollisionFreeImproved(start_sn)/*detectCollision(start_sn)*/)
     return false;
 
   // Set start node
@@ -736,6 +777,7 @@ bool AstarSearch::setGoalNode()
   int index_theta;
   poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
   auto start = std::chrono::system_clock::now();
+  //todo use adjust by dis tf decend dir
   clearArea(index_x, index_y);
   auto end = std::chrono::system_clock::now();
   auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -751,7 +793,7 @@ bool AstarSearch::setGoalNode()
 //  }
 
   // Check if goal is valid
-  if (isOutOfRange(index_x, index_y) /*|| detectCollision(goal_sn)*/)
+  if (isOutOfRange(index_x, index_y) || !isSingleStateCollisionFreeImproved(goal_sn)/*|| detectCollision(goal_sn)*/)
     return false;
 //  if(detectCollision(goal_sn)) {
 //    ROS_INFO("goal Pose invalid, modifying");
@@ -781,7 +823,7 @@ bool AstarSearch::setGoalNode()
 //    std::cout << "wavefront cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
     if (!wavefront_result) {
-      ROS_WARN("Goal is not reachable...");
+      ROS_WARN("Goal is not reachable by wavefront checking!");
       return false;
     }
   }
@@ -827,6 +869,12 @@ bool AstarSearch::search()
       geometry_msgs::Pose p;
       p.position.x = next_x;
       p.position.y = next_y;
+        // different color show back or forward
+        if(true == state.back) {
+            p.position.z = -1;
+        } else {
+            p.position.z = 1;
+        }
       tf::quaternionTFToMsg(tf::createQuaternionFromYaw(next_theta), p.orientation);
       p = astar::transformPose(p, map2ogm_);
       debug_pose_array_.poses.push_back(p);
@@ -849,7 +897,7 @@ bool AstarSearch::search()
       next.index_theta = (next.index_theta + angle_size_) % angle_size_;
 
       // Check if the index is valid
-      if (isOutOfRange(next.index_x, next.index_y) || detectCollision(next))
+      if (isOutOfRange(next.index_x, next.index_y) || !isSingleStateCollisionFreeImproved(next)/*detectCollision(next)*/)
         continue;
 
       AstarNode *next_node = &nodes_[next.index_y][next.index_x][next.index_theta];
@@ -921,10 +969,7 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
 {
   start_pose_local_.pose = start_pose;
   goal_pose_local_.pose  = goal_pose;
-  ros::WallTime begin = ros::WallTime::now();
   setMap(map);
-  ros::WallTime end = ros::WallTime::now();
-//  std::cout << "set map time: " << (end - begin).toSec() * 1000 << "[ms]" << '\n';
   if (!setStartNode()) {
     ROS_WARN("Invalid start pose!");
     return false;
@@ -1005,5 +1050,106 @@ void AstarSearch::broadcastPathTF()
   }
 
 }
+
+    bool AstarSearch::isSingleStateCollisionFree(const SimpleNode &current_state) {
+        hmpl::State current;
+        static double one_angle_range = 2.0 * M_PI / angle_size_;
+        // convert to ogm: origin(0,0) is on center
+        getOdomCoordinates(current.x, current.y, current_state.index_x, current_state.index_y);
+        current.z = current_state.index_theta * one_angle_range;
+        // get the footprint circles based on current vehicle state in global frame
+        std::vector<hmpl::Circle> footprint = this->car_.getCurrentCenters(current);
+        // footprint checking
+        for (auto &circle_itr : footprint) {
+            grid_map::Position pos(circle_itr.position.x,
+                                   circle_itr.position.y);
+            // complete collision checking
+            if (this->igm_.maps.isInside(pos)) {
+                double clearance = this->igm_.getObstacleDistance(pos);
+                if (clearance < circle_itr.r) {  // collision
+                    // less than circle radius, collision
+                    return false;
+                }
+            } else {
+                // beyond boundaries , collision
+                return false;
+            }
+        }
+        // all checked, current state is collision-free
+        return true;
+    }
+
+    bool AstarSearch::isSingleStateCollisionFree(const hmpl::State &current) {
+        // get the footprint circles based on current vehicle state in global frame
+        std::vector<hmpl::Circle> footprint =
+                this->car_.getCurrentCenters(current);
+        // footprint checking
+        for (auto &circle_itr : footprint) {
+            grid_map::Position pos(circle_itr.position.x,
+                                   circle_itr.position.y);
+            // complete collision checking
+            if (this->igm_.maps.isInside(pos)) {
+                double clearance = this->igm_.getObstacleDistance(pos);
+                if (clearance < circle_itr.r) {  // collision
+                    // less than circle radius, collision
+                    return false;
+                }
+            } else {
+                // beyond boundaries , collision
+                return false;
+            }
+        }
+        // all checked, current state is collision-free
+        return true;
+    }
+
+
+
+
+
+
+    bool AstarSearch::isSingleStateCollisionFreeImproved(const SimpleNode &current_state) {
+        hmpl::State current;
+        static double one_angle_range = 2.0 * M_PI / angle_size_;
+        // convert to ogm: origin(0,0) is on center
+        getOdomCoordinates(current.x, current.y, current_state.index_x, current_state.index_y);
+        current.z = current_state.index_theta * one_angle_range;
+        // get the bounding circle position in global frame
+        hmpl::Circle bounding_circle = this->car_.getBoundingCircle(current);
+
+        grid_map::Position pos(bounding_circle.position.x,
+                               bounding_circle.position.y);
+        if (this->igm_.maps.isInside(pos)) {
+            double clearance = this->igm_.getObstacleDistance(pos);
+            if (clearance < bounding_circle.r) {
+                // the big circle is not collision-free, then do an exact
+                // collision checking
+                return (this->isSingleStateCollisionFree(current));
+            } else { // collision-free
+                return true;
+            }
+        } else {  // beyond the map boundary
+            return false;
+        }
+    }
+
+
+    void AstarSearch::InitCarGeometry(hmpl::CarGeometry &car) {
+        car.setBase2Back(base2back_);
+        car.setMinTurnRadius(minimum_turning_radius_);
+        car.setVehicleLength(robot_length_);
+        car.setVehicleWidth(robot_width_);
+        car.setWheebase(robot_wheelbase_);
+        car.buildCirclesFromFootprint();
+    }
+
+    bool AstarSearch::getOdomCoordinates(double &x, double &y, unsigned int ind_x, unsigned int ind_y) {
+        if(isOutOfRange(ind_x, ind_y)) {
+            return false;
+        } else {
+            x = ind_x * map_info_.resolution + map_info_.origin.position.x;
+            y = ind_y * map_info_.resolution + map_info_.origin.position.y;
+        }
+    }
 
 }

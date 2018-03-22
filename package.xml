@@ -16,7 +16,8 @@
   <depend>internal_grid_map</depend>
   <depend>visualization_msgs</depend>
   <depend>control_msgs</depend>
-
+  <depend>grid_map_ros</depend>
+  <depend>car_model</depend>
   <export>
   </export>
 </package>

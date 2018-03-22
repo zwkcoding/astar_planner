@@ -3,6 +3,12 @@
 
 #define DEBUG 1
 
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <string>
+#include <chrono>
+
 #include "astar_util.h"
 #include <ros/ros.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -10,14 +16,10 @@
 #include <nav_msgs/Path.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
-#include "visualization_msgs/MarkerArray.h"
-#include "internal_grid_map/internal_grid_map.hpp"
+#include <visualization_msgs/MarkerArray.h>
+#include <internal_grid_map/internal_grid_map.hpp>
+#include <car_model/car_geometry.hpp>
 
-#include <iostream>
-#include <vector>
-#include <queue>
-#include <string>
-#include <chrono>
 
 namespace astar_planner {
 
@@ -46,6 +48,7 @@ class AstarSearch
   void createStateUpdateTable(int angle_size);
   void createStateUpdateTableLocal(int angle_size); //
   void poseToIndex(const geometry_msgs::Pose &pose, int *index_x, int *index_y, int *index_theta);
+  bool getOdomCoordinates(double &x, double &y, unsigned int ind_x, unsigned int ind_y);
   bool isOutOfRange(int index_x, int index_y);
   void setPath(const SimpleNode &goal);
 
@@ -56,6 +59,14 @@ class AstarSearch
   bool detectCollision(const SimpleNode &sn);
   bool calcWaveFrontHeuristic(const SimpleNode &sn);
   bool detectCollisionWaveFront(const WaveFrontNode &sn);
+  // use car geometry and gridmap pkg
+  void InitCarGeometry(hmpl::CarGeometry &car);
+
+  bool isSingleStateCollisionFree(const SimpleNode &current_state);
+  bool isSingleStateCollisionFree(const hmpl::State &current);
+  bool isSingleStateCollisionFreeImproved(const SimpleNode &current_state);
+  bool isSinglePathCollisionFreeImproved(std::vector<SimpleNode> *curve);
+
   bool findValidClosePose(const grid_map::GridMap& grid_map,
                           const std::string dis_layer_name,
                           const grid_map::Index& start_index,
@@ -92,11 +103,11 @@ class AstarSearch
   bool use_back_;                 // use backward driving
   double robot_length_;
   double robot_width_;
+  double robot_wheelbase_;
   double base2back_;
   double curve_weight_;
   double reverse_weight_;
   bool use_wavefront_heuristic_;
-  bool use_2dnav_goal_;
 
   bool node_initialized_;
   std::vector<std::vector<NodeUpdate>> state_update_table_;
@@ -126,7 +137,10 @@ class AstarSearch
 
   // gridmap
   hmpl::InternalGridMap igm_;
-  ros::Publisher ogm_pub_;
+
+  // car model
+  hmpl::CarGeometry car_;
+
 
 
 

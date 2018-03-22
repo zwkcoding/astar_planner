@@ -88,10 +88,10 @@ int main(int argc, char **argv) {
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
-    ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path", 1, true);
-    ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>("/global_path", 1, true);
-    ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, true);
-    ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, true);
+    ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path", 1, false);
+    ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>("/global_path", 1, false);
+    ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, false);
+    ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, false);
 
     ros::Rate loop_rate(10);
     while (ros::ok()) {
