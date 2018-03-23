@@ -76,15 +76,33 @@ int main(int argc, char **argv) {
     std::string map_topic;
     private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
 
+    std::string package_dir = ros::package::getPath("astar_planner");
+    std::string img_dir = "/obstacles.png";
+    cv::Mat img_src = cv::imread(package_dir + img_dir, CV_8UC1);
+    double resolution = 0.2;  // in meter
+    hmpl::InternalGridMap in_gm;
+    // set the 2d position of the center point of grid map in the grid map frame
+    in_gm.initializeFromImage(img_src, resolution, grid_map::Position::Zero());
+    in_gm.addObstacleLayerFromImage(img_src, 0.5);
+    in_gm.updateDistanceLayer();
+    in_gm.maps.setFrameId("odom");
+    ROS_INFO("Created map with size %f x %f m (%i x %i cells), map resolution is %f",
+             in_gm.maps.getLength().x(), in_gm.maps.getLength().y(),
+             in_gm.maps.getSize()(0), in_gm.maps.getSize()(1), in_gm.maps.getResolution());
+    // create map publisher
+    ros::Publisher map_publisher =
+            n.advertise<nav_msgs::OccupancyGrid>(map_topic, 1, true);
+
+
 
     AstarSearch astar;
     SearchInfo search_info;
 
     // ROS subscribers
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
-    ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
+//    ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
 //    ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
-//    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
+    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
@@ -97,7 +115,17 @@ int main(int argc, char **argv) {
     while (ros::ok()) {
         ros::spinOnce();
 
-        if (!search_info.getMapSet() || !search_info.getStartSet() /*|| !search_info.getGoalSet()*/) {
+        // Add data to grid map.
+        ros::Time time = ros::Time::now();
+        // publish the grid_map
+        in_gm.maps.setTimestamp(time.toNSec());
+        nav_msgs::OccupancyGrid message;
+        grid_map::GridMapRosConverter::toOccupancyGrid(
+                in_gm.maps, in_gm.obs, in_gm.FREE, in_gm.OCCUPY, message);
+        map_publisher.publish(message);
+
+
+        if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
             loop_rate.sleep();
             continue;
         }
@@ -106,7 +134,7 @@ int main(int argc, char **argv) {
         search_info.reset();
 
         // new next goal received and not reached
-        if(search_info.goal_update_flag_ == false && search_info.getGoalSet()) {
+        if(/*search_info.goal_update_flag_ == false && */search_info.getGoalSet()) {
             auto start = std::chrono::system_clock::now();
             // Execute astar search
             bool result = astar.makePlan(search_info.getStartPose().pose, search_info.getGoalPose().pose,

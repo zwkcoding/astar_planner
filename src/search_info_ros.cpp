@@ -141,7 +141,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   goal_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   goal_pose_global_.header = msg->header;
   // first time receive goal command or arrived last goal
-  if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
+  if(1/*last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true*/) {
     ROS_INFO("last goal is reached or last goal is aborted!");
     goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
     goal_pose_local_.header = goal_pose_global_.header;
@@ -158,6 +158,6 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 void SearchInfo::reset()
 {
   map_set_   = false;
-  start_set_ = false;
-//  goal_set_  = false;
+  start_set_ = true;
+  goal_set_  = true;
 }
