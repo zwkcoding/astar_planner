@@ -222,7 +222,7 @@ void AstarSearch::samplePathByStepLength(double step) {
     this->dense_path_.poses.clear();
     geometry_msgs::PoseStamped ros_pose;
     ros_pose.header = header;
-    for (std::size_t i = 0; i < path_.poses.size() - 1 ; i++) {
+    for (std::size_t i = 0; i < path_.poses.size() - 1; i++) {
         double x1, y1, x2, y2;
         x1 = path_.poses.at(i).pose.position.x;
         y1 = path_.poses.at(i).pose.position.y;
@@ -240,44 +240,70 @@ void AstarSearch::samplePathByStepLength(double step) {
             // calculate how many points need to be inserted by step
             double num = delta_s / step;
             for (int j = 0; j < static_cast<int>(num); j++) {
-                ros_pose.pose.position.x = x1 + cos(t1) * step * j;
-                ros_pose.pose.position.y = y1 + sin(t2) * step * j;
+                double shift_x = cos(t1) * step * j;
+                double shift_y = sin(t2) * step * j;
+                // back
+                if (-1 == ros_pose.pose.position.z) {
+                    shift_x = -shift_x;
+                    shift_y = -shift_y;
+                }
+                ros_pose.pose.position.x = x1 + shift_x;
+                ros_pose.pose.position.y = y1 + shift_y;
                 ros_pose.pose.orientation = path_.poses.at(i).pose.orientation;
                 dense_path_.poses.push_back(ros_pose);
             }
         } else if (delta_t > 0) {
-            // left turn
+            // forward :left turn
+            // back : right turn
             // arc length
-            double R = delta_s / (sqrt(2*(1 - cos(delta_abs_t))));  // no need to cal, R is a constant
+            double R = delta_s / (sqrt(2 * (1 - cos(delta_abs_t))));  // no need to cal, R is a constant
             double l = R * delta_abs_t;
-            double center_x = x1 + cos(t1 + M_PI / 2.0)*R;
-            double center_y = y1 + sin(t1 + M_PI / 2.0)*R;
+            double center_x = x1 - sin(t1) * R;
+            double center_y = y1 + cos(t1) * R;
+            if (-1 == ros_pose.pose.position.z) {
+                center_x = x1 + sin(t1) * R;
+                center_y = y1 - cos(t1) * R;
+            }
             // delta arc length now becomes l
             double num = l / step;
             int size = static_cast<int>(num);
             for (int j = 0; j < size; j++) {
-                double heading = t1 + j*step / l * delta_abs_t;
-                ros_pose.pose.position.x = center_x + cos(heading - M_PI / 2.0)*R;
-                ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0)*R;
+                double heading = t1 + j * step / l * delta_abs_t;
+                double rotate_angle = j * step / l * delta_abs_t;
+                ros_pose.pose.position.x = center_x + cos(heading - M_PI / 2.0) * R;
+                ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0) * R;
+                // todo checkbug
+//                astar::counterClockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
+                ros_pose.pose.position.x = x1;
+                ros_pose.pose.position.y = y1;
                 ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                 dense_path_.poses.push_back(ros_pose);
             }
-           
+
         } else {
-            // right turn
+            // forward: right turn
+            // back : left turn
             // arc length
-            double R = delta_s / (sqrt(2*(1 - cos(delta_abs_t))));
+            double R = delta_s / (sqrt(2 * (1 - cos(delta_abs_t))));
             double l = R * delta_abs_t;
-            double center_x = x1 + cos(t1 - M_PI / 2.0)*R;
-            double center_y = y1 + sin(t1 - M_PI / 2.0)*R;
+            double center_x = x1 + sin(t1) * R;
+            double center_y = y1 - cos(t1) * R;
+            if (-1 == ros_pose.pose.position.z) {
+                center_x = x1 - sin(t1) * R;
+                center_y = y1 + cos(t1) * R;
+            }
             // delta arc length now becomes l
             double num = l / step;
-            
+
             int size = static_cast<int>(num);
             for (int j = 0; j < size; j++) {
-                double heading = t1 - j*step / l * delta_abs_t;
-                ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0)*R;
-                ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0)*R;
+                double heading = t1 - j * step / l * delta_abs_t;
+                double rotate_angle = j * step / l * delta_abs_t;
+                ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0) * R;
+                ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0) * R;
+//                astar::clockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
+                ros_pose.pose.position.x = x1;
+                ros_pose.pose.position.y = y1;
                 ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                 dense_path_.poses.push_back(ros_pose);
             }
@@ -968,7 +994,9 @@ bool AstarSearch::search()
 bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose, const nav_msgs::OccupancyGrid &map)
 {
   start_pose_local_.pose = start_pose;
+  start_pose_.pose = astar::transformPose(start_pose_local_.pose, map2ogm_);
   goal_pose_local_.pose  = goal_pose;
+  goal_pose_.pose = astar::transformPose(goal_pose_local_.pose, map2ogm_);
   setMap(map);
   if (!setStartNode()) {
     ROS_WARN("Invalid start pose!");
