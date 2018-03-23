@@ -117,8 +117,8 @@ class AstarSearch
   std::vector<SimpleNode> goallist_;
 
   // Pose in global(/map) frame
-  geometry_msgs::PoseStamped start_pose_;
-  geometry_msgs::PoseStamped goal_pose_;
+  geometry_msgs::Pose start_pose_;
+  geometry_msgs::Pose goal_pose_;
 
   // Pose in OccupancyGrid frame
   geometry_msgs::PoseStamped start_pose_local_;

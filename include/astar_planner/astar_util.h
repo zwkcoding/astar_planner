@@ -124,6 +124,40 @@ inline double calcDiffOfRadian(double a, double b)
     return 2 * M_PI - diff;
 }
 
+inline void clockwiseRotatePoint(double ref_x, double ref_y, double angle, double &point_x, double &point_y) {
+  float s = sin(angle);
+  float c = cos(angle);
+
+  // translate point back to origin:
+  point_x -= ref_x;
+  point_y -= ref_y;
+
+  // rotate point
+  float xnew = point_x * c + point_y * s;
+  float ynew = -point_x * s + point_y * c;
+
+  // translate point back:
+  point_x = xnew + ref_x;
+  point_y = ynew + ref_y;
+}
+
+inline void counterClockwiseRotatePoint(double ref_x, double ref_y, double angle, double &point_x, double &point_y) {
+  float s = sin(angle);
+  float c = cos(angle);
+
+  // translate point back to origin:
+  point_x -= ref_x;
+  point_y -= ref_y;
+
+  // rotate point
+  float xnew = point_x * c - point_y * s;
+  float ynew = point_x * s + point_y * c;
+
+  // translate point back:
+  point_x = xnew + ref_x;
+  point_y = ynew + ref_y;
+}
+
 } // namespace astar
 
 #endif
