@@ -161,3 +161,7 @@ void SearchInfo::reset()
   start_set_ = false;
 //  goal_set_  = false;
 }
+
+void SearchInfo::resetReceiveMapFlag() {
+    map_set_   = false;
+}

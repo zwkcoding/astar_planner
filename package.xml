@@ -18,6 +18,8 @@
   <depend>control_msgs</depend>
   <depend>grid_map_ros</depend>
   <depend>car_model</depend>
+  <depend>iv_explore_msgs</depend>
+
   <export>
   </export>
 </package>

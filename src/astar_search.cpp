@@ -993,6 +993,7 @@ bool AstarSearch::search()
 
 bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose, const nav_msgs::OccupancyGrid &map)
 {
+  status_code_ = 0;
   start_pose_local_.pose = start_pose;
   start_pose_.pose = astar::transformPose(start_pose_local_.pose, map2ogm_);
   goal_pose_local_.pose  = goal_pose;
@@ -1000,15 +1001,21 @@ bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry
   setMap(map);
   if (!setStartNode()) {
     ROS_WARN("Invalid start pose!");
+    status_code_ = 1;
     return false;
   }
 
   if (!setGoalNode()) {
     ROS_WARN("Invalid goal pose!");
-    return false;
+      status_code_ = 2;
+      return false;
   }
   auto start = std::chrono::system_clock::now();
   bool result = search();
+    if(false == result) {
+        status_code_ = 3;
+    }
+
   auto end0 = std::chrono::system_clock::now();
   auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';

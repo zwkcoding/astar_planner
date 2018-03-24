@@ -37,6 +37,7 @@ class AstarSearch
 
   bool makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose, const nav_msgs::OccupancyGrid &map);
   void reset();
+  int8_t getStatusCode();
   void broadcastPathTF();
   nav_msgs::Path getPath() {return path_;}
   nav_msgs::Path getDensePath() {return dense_path_;}
@@ -141,7 +142,8 @@ class AstarSearch
   // car model
   hmpl::CarGeometry car_;
 
-
+  // status code
+  int8_t status_code_;
 
 
 };

@@ -17,16 +17,17 @@ find_package(catkin REQUIRED COMPONENTS
         control_msgs
         grid_map_ros
         car_model
+        iv_explore_msgs
         )
 find_package(OpenCV REQUIRED)
-
+find_package(Boost REQUIRED)
 ###################################
 ## catkin specific configuration ##
 ###################################
 catkin_package(
         LIBRARIES hybrid_astar
         CATKIN_DEPENDS roscpp std_msgs tf opt_utils internal_grid_map visualization_msgs
-        DEPENDS OpenCV
+        DEPENDS OpenCV Boost
 )
 
 ###########
@@ -39,6 +40,7 @@ include_directories(
         include
         ${OpenCV_INCLUDE_DIRS}
         ${catkin_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME}
@@ -56,5 +58,15 @@ target_link_libraries(${PROJECT_NAME}
 
 add_executable(autonav
         src/autonav.cpp)
+target_link_libraries(autonav
+        ${linked_libs})
+
+add_executable(astar_server_node
+        src/astar_server_node.cpp)
+target_link_libraries(autonav
+        ${linked_libs})
+
+add_executable(get_plan_server
+        src/get_plan_server.cpp)
 target_link_libraries(autonav
         ${linked_libs})

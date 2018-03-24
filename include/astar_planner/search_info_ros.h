@@ -32,6 +32,7 @@ class SearchInfo
 
   // Reset flags
   void reset();
+  void resetReceiveMapFlag();
 
   // update flag
   bool goal_update_flag_;
