@@ -20,6 +20,7 @@ namespace astar_planner {
         private_nh_.param<double>("curve_weight", curve_weight_, 1.05);
         private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
         private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
+        private_nh_.param<double>("allow_offset_distance", offset_distance_, 2);
 
         // initial car geometry parameters
         InitCarGeometry(car_);
@@ -966,13 +967,12 @@ namespace astar_planner {
         // update map(distance map) before to judge whether to replan
         setMap(map);
         // todo last success, current plan choose start point in last path
-        // todo start pose far from current path, need to replan
         // judge whether to replan
         double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y, goal_pose.position.x,
                                                    goal_pose.position.y);
         if(true == last_result) {
             if(goal_dis_diff < 1) {
-                if(isSinglePathCollisionFreeImproved(local_path_)) {
+                if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose)) {
                     ROS_INFO_THROTTLE(1, "use last local path !");
                     replan = false;
                     path_ = last_path_;
@@ -1205,6 +1205,45 @@ namespace astar_planner {
         } else {
             x = ind_x * map_info_.resolution + map_info_.origin.position.x;
             y = ind_y * map_info_.resolution + map_info_.origin.position.y;
+        }
+    }
+
+    bool AstarSearch::isNearLastPath(const geometry_msgs::Pose &pose) {
+        // convert pose in ogm into odom
+        tf::Vector3 origin(pose.position.x, pose.position.y, 0);
+        tf::Pose tf_pose;
+        tf_pose.setOrigin(origin);
+        tf::Quaternion q;
+        tf::quaternionMsgToTF(pose.orientation, q);
+        tf_pose.setRotation(q);
+
+        // Transform path to global frame
+        tf_pose = map2ogm_ * tf_pose;
+
+        // Set path as ros message
+        geometry_msgs::Pose ros_pose;
+        tf::poseTFToMsg(tf_pose, ros_pose);
+
+        int index_min = -1;
+        double min = 999;
+        if(last_path_.poses.size() > 0) {
+            for (int i = 0; i < last_path_.poses.size(); i++) {
+                double deltax = last_path_.poses[i].pose.position.x - ros_pose.position.x;
+                double deltay = last_path_.poses[i].pose.position.y - ros_pose.position.y;
+                double dist = sqrt(pow(deltax, 2) + pow(deltay, 2));
+                if (dist < min) {
+                    min = dist;
+                    index_min = i;
+                }
+            }
+            if(min > offset_distance_) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        else {
+            return false;
         }
     }
 

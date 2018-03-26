@@ -67,7 +67,7 @@ class AstarSearch
   bool isSingleStateCollisionFreeImproved(const SimpleNode &current_state);
   bool isSingleStateCollisionFreeImproved(const hmpl::State &current);
   bool isSinglePathCollisionFreeImproved(std::vector<hmpl::State> &curve);
-
+  bool isNearLastPath(const geometry_msgs::Pose &pose);
   bool findValidClosePose(const grid_map::GridMap& grid_map,
                           const std::string dis_layer_name,
                           const grid_map::Index& start_index,
@@ -146,6 +146,8 @@ class AstarSearch
   // car model
   hmpl::CarGeometry car_;
 
+    // path replan parameters
+  double offset_distance_;
 
 
 
