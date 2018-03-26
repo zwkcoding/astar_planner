@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 #endif
 
     std::string map_topic;
-    private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
+    private_nh_.param<std::string>("map_topic", map_topic, "/local_map");
 
     std::string package_dir = ros::package::getPath("astar_planner");
     std::string img_dir = "/obstacles.png";
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     in_gm.initializeFromImage(img_src, resolution, grid_map::Position::Zero());
     in_gm.addObstacleLayerFromImage(img_src, 0.5);
     in_gm.updateDistanceLayer();
-    in_gm.maps.setFrameId("odom");
+    in_gm.maps.setFrameId("/odom");
     ROS_INFO("Created map with size %f x %f m (%i x %i cells), map resolution is %f",
              in_gm.maps.getLength().x(), in_gm.maps.getLength().y(),
              in_gm.maps.getSize()(0), in_gm.maps.getSize()(1), in_gm.maps.getResolution());
@@ -100,9 +100,9 @@ int main(int argc, char **argv) {
 
     // ROS subscribers
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
-//    ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
+    ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
 //    ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
-    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
+//    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
         nav_msgs::OccupancyGrid message;
         grid_map::GridMapRosConverter::toOccupancyGrid(
                 in_gm.maps, in_gm.obs, in_gm.FREE, in_gm.OCCUPY, message);
-        map_publisher.publish(message);
+//        map_publisher.publish(message);
 
 
         if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
@@ -151,8 +151,8 @@ int main(int argc, char **argv) {
                 astar.samplePathByStepLength();
 
                 // convert msg : from path to traj
-                path_pub.publish(astar.getDensePath());
                 nav_msgs::Path tmp = astar.getDensePath();
+                path_pub.publish(tmp);
                 control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
                 trajectory.header = tmp.header;

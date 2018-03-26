@@ -179,7 +179,8 @@ namespace astar_planner {
 
         // From the goal node to the start node
         AstarNode *node = &nodes_[goal.index_y][goal.index_x][goal.index_theta];
-
+        // clear last result path in local frame
+        local_path_.clear();
         while (node != NULL) {
             // Set tf pose
             tf::Vector3 origin(node->x, node->y, 0);
@@ -204,13 +205,22 @@ namespace astar_planner {
 
             path_.poses.push_back(ros_pose);
 
+            hmpl::State state;
+            state.x = node->x + map_info_.origin.position.x;
+            state.y = node->y + map_info_.origin.position.y;
+            state.z = node->theta;
+            local_path_.push_back(state);
+
             // To the next node
             node = node->parent;
         }
 
         // Reverse the vector to be start to goal order
         std::reverse(path_.poses.begin(), path_.poses.end());
+        std::reverse(local_path_.begin(), local_path_.end());
 
+        // keep path result
+        last_path_ = path_;
     }
 
     void AstarSearch::samplePathByStepLength(double step) {
@@ -603,6 +613,7 @@ namespace astar_planner {
     }
 
     void AstarSearch::reset() {
+
         // Clear path
         path_.poses.clear();
         // clear dense path
@@ -681,7 +692,7 @@ namespace astar_planner {
             for (size_t idx_y = 0; idx_y < size_y; ++idx_y) {
                 if (0.0 == grid_data(idx_x, idx_y)) {
                     grid_data(idx_x, idx_y) = igm_.FREE;
-                } else if (100.0 == grid_data(idx_x, idx_y)) {
+                } else if (grid_data(idx_x, idx_y) > obstacle_threshold_) {
                     grid_data(idx_x, idx_y) = igm_.OCCUPY;
                 } else {
                     // view unknown as obstacle
@@ -949,13 +960,40 @@ namespace astar_planner {
 
     bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose,
                                const nav_msgs::OccupancyGrid &map) {
+        static bool last_result = false;
+        static geometry_msgs::Pose last_goal;
+        bool replan = true;
+        // update map(distance map) before to judge whether to replan
+        setMap(map);
+        // todo last success, current plan choose start point in last path
+        // todo start pose far from current path, need to replan
+        // judge whether to replan
+        double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y, goal_pose.position.x,
+                                                   goal_pose.position.y);
+        if(true == last_result) {
+            if(goal_dis_diff < 1) {
+                if(isSinglePathCollisionFreeImproved(local_path_)) {
+                    ROS_INFO_THROTTLE(1, "use last local path !");
+                    replan = false;
+                    path_ = last_path_;
+                    return true;
+                } else {
+                    replan = true;
+                }
+            } else {
+                replan = true;
+            }
+        } else {
+            replan = true;
+        }
+
+
         start_pose_local_.pose = start_pose;
         start_pose_ = astar::transformPose(start_pose_local_.pose, map2ogm_);
 
         goal_pose_local_.pose = goal_pose;
         goal_pose_ = astar::transformPose(goal_pose_local_.pose, map2ogm_);
 
-        setMap(map);
         if (!setStartNode()) {
             ROS_WARN("Invalid start pose!");
             return false;
@@ -971,6 +1009,8 @@ namespace astar_planner {
         auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
+        last_goal = goal_pose;
+        last_result = result;
         return result;
     }
 
@@ -1109,6 +1149,45 @@ namespace astar_planner {
             return false;
         }
     }
+
+    bool AstarSearch::isSingleStateCollisionFreeImproved(const hmpl::State &current) {
+        // current state is in ogm: origin(0,0) is on center
+        // get the bounding circle position in global frame
+        hmpl::Circle bounding_circle = this->car_.getBoundingCircle(current);
+
+        grid_map::Position pos(bounding_circle.position.x, bounding_circle.position.y);
+        if (this->igm_.maps.isInside(pos)) {
+            double clearance = this->igm_.getObstacleDistance(pos);
+            if (clearance < bounding_circle.r) {
+                // the big circle is not collision-free, then do an exact
+                // collision checking
+                return (this->isSingleStateCollisionFree(current));
+            } else { // collision-free
+                return true;
+            }
+        } else {  // beyond the map boundary
+            return false;
+        }
+    }
+
+
+
+    bool AstarSearch::isSinglePathCollisionFreeImproved(std::vector<hmpl::State> &curve) {
+        for (auto &state_itr : curve) {
+            // path collision checking in global frame
+            // get the car footprint bounding circle in global frame, prepare for
+            // the collision checking
+
+            if (!this->isSingleStateCollisionFreeImproved(state_itr)) {
+                // collision
+                return false;
+            } else {
+                // collision-free
+            }
+        }
+        return true;
+    }
+
 
 
     void AstarSearch::InitCarGeometry(hmpl::CarGeometry &car) {

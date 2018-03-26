@@ -17,7 +17,7 @@ void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
   map_ = *msg;
 
   // TODO: what frame do we use?
-  std::string map_frame = "odom";
+  std::string map_frame = "/odom";
   std::string ogm_frame = msg->header.frame_id;
   // Set transform
   tf::StampedTransform map2ogm_frame;
@@ -70,7 +70,7 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
   
   start_pose_global_.header.frame_id = "/odom";
   start_pose_global_.header.stamp = ros::Time::now();
-  start_pose_local_.header = start_pose_global_.header;
+  start_pose_local_.header = msg->header;
   
   start_set_ = true;
 }
@@ -102,13 +102,8 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
   start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_global_.header = msg->header;
   start_pose_local_.pose = astar::transformPose(start_pose_global_.pose, ogm2map_);
-  start_pose_local_.header = start_pose_local_.header;
-  if(!last_goal_pose_local_.header.frame_id.empty()) {
-    if (sqrt(std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
-         + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 3) {
-      goal_update_flag_ = true;
-    }
-  }
+  start_pose_local_.header = start_pose_global_.header;
+
   start_set_ = true;
 }
 
