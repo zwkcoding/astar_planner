@@ -19,7 +19,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <internal_grid_map/internal_grid_map.hpp>
 #include <car_model/car_geometry.hpp>
-
+#include <opt_utils/opt_utils.hpp>
 
 namespace astar_planner {
 
@@ -65,7 +65,10 @@ class AstarSearch
   bool isSingleStateCollisionFree(const SimpleNode &current_state);
   bool isSingleStateCollisionFree(const hmpl::State &current);
   bool isSingleStateCollisionFreeImproved(const SimpleNode &current_state);
-  bool isSinglePathCollisionFreeImproved(std::vector<SimpleNode> *curve);
+  bool isSingleStateCollisionFreeImproved(const hmpl::State &current);
+  bool isSinglePathCollisionFreeImproved(std::vector<hmpl::State> &curve);
+  bool isNearLastPath(const geometry_msgs::Pose &pose);
+
 
   bool findValidClosePose(const grid_map::GridMap& grid_map,
                           const std::string dis_layer_name,
@@ -117,8 +120,8 @@ class AstarSearch
   std::vector<SimpleNode> goallist_;
 
   // Pose in global(/map) frame
-  geometry_msgs::PoseStamped start_pose_;
-  geometry_msgs::PoseStamped goal_pose_;
+  geometry_msgs::Pose start_pose_;
+  geometry_msgs::Pose goal_pose_;
 
   // Pose in OccupancyGrid frame
   geometry_msgs::PoseStamped start_pose_local_;
@@ -134,12 +137,21 @@ class AstarSearch
   nav_msgs::Path path_;
   // Dense path
   nav_msgs::Path dense_path_;
+  // last path result
+    nav_msgs::Path last_path_;
+    // local path result
+    std::vector<hmpl::State> local_path_;
+
 
   // gridmap
   hmpl::InternalGridMap igm_;
 
   // car model
   hmpl::CarGeometry car_;
+
+  //  path replan parameters
+  double offset_distance_;
+
 
 
 

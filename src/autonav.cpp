@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
         search_info.reset();
 
         // new next goal received and not reached
-        if(search_info.goal_update_flag_ == false) {
+        if(false == search_info.goal_update_flag_) {
             auto start = std::chrono::system_clock::now();
             // Execute astar search
             bool result = astar.makePlan(search_info.getStartPose().pose, search_info.getGoalPose().pose,
