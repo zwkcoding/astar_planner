@@ -11,7 +11,7 @@
 #include <control_msgs/Trajectory.h>
 
 //#define Time_Profile
-
+#define CONTROL_LOCAL_PATH
 #include <ros/package.h>
 
 using namespace astar_planner;
@@ -93,6 +93,7 @@ int main(int argc, char **argv) {
     ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, false);
     ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, false);
 
+    tf::TransformListener tf_listener_;
     ros::Rate loop_rate(10);
     while (ros::ok()) {
         ros::spinOnce();
@@ -127,6 +128,7 @@ int main(int argc, char **argv) {
                 nav_msgs::Path tmp = astar.getDensePath();
                 control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
+#ifndef CONTROL_LOCAL_PATH
                 trajectory.header = tmp.header;
                 for (int i = 0; i < tmp.poses.size(); i++) {
                     path_node.position.x = tmp.poses[i].pose.position.x;
@@ -139,6 +141,35 @@ int main(int argc, char **argv) {
                     path_node.velocity.linear.x = 1.5;
                     trajectory.points.push_back(path_node);
                 }
+#else
+                // Get transform (map to world in Autoware)
+                tf::StampedTransform world2map;
+                try
+                {
+                    tf_listener_.lookupTransform("base_link", "/odom", ros::Time(0), world2map);
+                }
+                catch (tf::TransformException ex)
+                {
+                    ROS_ERROR("%s", ex.what());
+//                    return;
+                }
+
+                trajectory.header.frame_id = "base_link";
+                trajectory.header.stamp = ros::Time::now();
+                for (int i = 0; i < tmp.poses.size(); i++) {
+                    tmp.poses[i].pose = astar::transformPose(tmp.poses[i].pose, world2map);
+                    path_node.position.x = tmp.poses[i].pose.position.x;
+                    path_node.position.y = tmp.poses[i].pose.position.y;
+                    if (tmp.poses[i].pose.position.z == -1) {
+                        path_node.forward = 0;  // 0 --> back
+                    } else {
+                        path_node.forward = 1; // 1 --> forward
+                    }
+                    path_node.velocity.linear.x = 1.5;
+                    trajectory.points.push_back(path_node);
+                }
+
+#endif
 
                 trajectory_pub.publish(trajectory);
 #ifdef Time_Profile
