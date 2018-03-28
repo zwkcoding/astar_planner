@@ -680,7 +680,31 @@ namespace astar_planner {
             node_initialized_ = true;
         }
 
-        ros::WallTime begin = ros::WallTime::now();
+        for (size_t i = 0; i < map.info.height; i++) {
+            for (size_t j = 0; j < map.info.width; j++) {
+                // Index of subscribing OccupancyGrid message
+                size_t og_index = i * map.info.width + j;
+                int cost = map.data[og_index];
+
+                // more than threshold or unknown area
+                if (cost > obstacle_threshold_ || cost < 0) {
+                    nodes_[i][j][0].status = STATUS::OBS;
+                } else {
+                    for (int k = 0; k < angle_size_; k++) {
+                        //nodes_[i][j][k].gc     = 0;
+                        nodes_[i][j][k].hc = 0;
+                        nodes_[i][j][k].status = STATUS::NONE;
+                        nodes_[i][j][k].parent = NULL;
+                    }
+                }
+
+            }
+        }
+
+    }
+
+    void AstarSearch::updateGridMap(const nav_msgs::OccupancyGrid &map) {
+        //        ros::WallTime begin = ros::WallTime::now();
         grid_map::GridMapRosConverter::fromOccupancyGrid(map, igm_.obs, igm_.maps);
         // from occupancy to gridmap
         // value replacement
@@ -708,28 +732,6 @@ namespace astar_planner {
         igm_.updateDistanceLayerCV();
         ros::WallTime end = ros::WallTime::now();
 //  std::cout << "gridmap process time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
-
-        for (size_t i = 0; i < map.info.height; i++) {
-            for (size_t j = 0; j < map.info.width; j++) {
-                // Index of subscribing OccupancyGrid message
-                size_t og_index = i * map.info.width + j;
-                int cost = map.data[og_index];
-
-                // more than threshold or unknown area
-                if (cost > obstacle_threshold_ || cost < 0) {
-                    nodes_[i][j][0].status = STATUS::OBS;
-                } else {
-                    for (int k = 0; k < angle_size_; k++) {
-                        //nodes_[i][j][k].gc     = 0;
-                        nodes_[i][j][k].hc = 0;
-                        nodes_[i][j][k].status = STATUS::NONE;
-                        nodes_[i][j][k].parent = NULL;
-                    }
-                }
-
-            }
-        }
-
     }
 
     bool AstarSearch::setStartNode() {
@@ -969,11 +971,7 @@ namespace astar_planner {
         static geometry_msgs::Pose last_goal;
         bool replan = true;
         // update map(distance map) before to judge whether to replan
-        auto start = std::chrono::system_clock::now();
-        setMap(map);
-        auto end = std::chrono::system_clock::now();
-        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        ROS_INFO_STREAM_THROTTLE(1, "map update cost time[ms]:" << usec / 1000.0);
+        updateGridMap(map);
 
         // todo last success, current plan choose start point in last path
         // judge whether to replan
@@ -1000,6 +998,12 @@ namespace astar_planner {
         start_pose_ = astar::transformPose(start_pose_local_.pose, map2ogm_);
         goal_pose_local_.pose = goal_pose;
         goal_pose_ = astar::transformPose(goal_pose_local_.pose, map2ogm_);
+
+        auto start = std::chrono::system_clock::now();
+        setMap(map);  // todo time costy when map is large!
+        auto end = std::chrono::system_clock::now();
+        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        ROS_INFO_STREAM_THROTTLE(1, "map update cost time[ms]:" << usec / 1000.0);
 
         if (!setStartNode()) {
             ROS_WARN("Invalid start pose!");

@@ -52,6 +52,7 @@ class AstarSearch
   bool isOutOfRange(int index_x, int index_y);
   void setPath(const SimpleNode &goal);
 
+  void updateGridMap(const nav_msgs::OccupancyGrid &map);
   void setMap(const nav_msgs::OccupancyGrid &map);
   bool setStartNode();
   bool setGoalNode();
