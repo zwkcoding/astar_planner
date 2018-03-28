@@ -207,6 +207,7 @@ namespace astar_planner {
             path_.poses.push_back(ros_pose);
 
             hmpl::State state;
+            // convert coord(0,0) to map center
             state.x = node->x + map_info_.origin.position.x;
             state.y = node->y + map_info_.origin.position.y;
             state.z = node->theta;
@@ -288,8 +289,8 @@ namespace astar_planner {
                     ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0) * R;
                     // todo checkbug
 //                astar::counterClockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
-                    ros_pose.pose.position.x = x1;
-                    ros_pose.pose.position.y = y1;
+//                    ros_pose.pose.position.x = x1;
+//                    ros_pose.pose.position.y = y1;
                     ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                     dense_path_.poses.push_back(ros_pose);
                 }
@@ -316,8 +317,8 @@ namespace astar_planner {
                     ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0) * R;
                     ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0) * R;
 //                astar::clockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
-                    ros_pose.pose.position.x = x1;
-                    ros_pose.pose.position.y = y1;
+//                    ros_pose.pose.position.x = x1;
+//                    ros_pose.pose.position.y = y1;
                     ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                     dense_path_.poses.push_back(ros_pose);
                 }
@@ -968,7 +969,12 @@ namespace astar_planner {
         static geometry_msgs::Pose last_goal;
         bool replan = true;
         // update map(distance map) before to judge whether to replan
+        auto start = std::chrono::system_clock::now();
         setMap(map);
+        auto end = std::chrono::system_clock::now();
+        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        ROS_INFO_STREAM_THROTTLE(1, "map update cost time[ms]:" << usec / 1000.0);
+
         // todo last success, current plan choose start point in last path
         // judge whether to replan
         double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y,
@@ -1004,10 +1010,10 @@ namespace astar_planner {
             ROS_WARN("Invalid goal pose!");
             return false;
         }
-        auto start = std::chrono::system_clock::now();
+//        start = std::chrono::system_clock::now();
         bool result = search();
-        auto end0 = std::chrono::system_clock::now();
-        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start).count();
+//        end = std::chrono::system_clock::now();
+//        usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
         last_goal = goal_pose;

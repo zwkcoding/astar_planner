@@ -73,12 +73,12 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Alpha: 1
-      Arrow Length: 0.300000012
+      Arrow Length: 0.600000024
       Axes Length: 0.300000012
       Axes Radius: 0.00999999978
       Class: rviz/PoseArray
       Color: 255; 25; 0
-      Enabled: false
+      Enabled: true
       Head Length: 0.0700000003
       Head Radius: 0.0299999993
       Name: PoseArray
@@ -87,13 +87,17 @@ Visualization Manager:
       Shape: Arrow (Flat)
       Topic: /debug_pose_array
       Unreliable: false
-      Value: false
+      Value: true
     - Class: rviz/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        abso_odom:
+          Value: true
         base_link:
+          Value: true
+        local_map_frame:
           Value: true
         odom:
           Value: true
@@ -103,19 +107,21 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        odom:
-          base_link:
-            {}
+        abso_odom:
+          odom:
+            base_link:
+              local_map_frame:
+                {}
       Update Interval: 0
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: false
+      Enabled: true
       Marker Topic: /astar_footprint
       Name: MarkerArray
       Namespaces:
-        {}
+        footprint: true
       Queue Size: 100
-      Value: false
+      Value: true
     - Angle Tolerance: 0.100000001
       Class: rviz/Odometry
       Covariance:
@@ -134,7 +140,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 2
+      Keep: 5
       Name: Odometry
       Position Tolerance: 0.100000001
       Shape:
@@ -154,12 +160,12 @@ Visualization Manager:
       Class: rviz/Map
       Color Scheme: map
       Draw Behind: false
-      Enabled: true
+      Enabled: false
       Name: Map
       Topic: /local_map
       Unreliable: false
       Use Timestamp: false
-      Value: true
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -183,7 +189,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.00999923889
+      Angle: -0.0500016995
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
@@ -193,11 +199,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Scale: 22.8231964
+      Scale: 14.690752
       Target Frame: map
       Value: TopDownOrtho (rviz)
-      X: -228371.5
-      Y: 4196145.5
+      X: 3.00126457
+      Y: -1.73249757
     Saved: ~
 Window Geometry:
   Displays:

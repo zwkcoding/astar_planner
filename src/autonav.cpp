@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 
                 // convert msg : from path to traj
                 path_pub.publish(astar.getDensePath());
-                nav_msgs::Path tmp = astar.getDensePath();
+                nav_msgs::Path tmp = astar.getPath();  // use path, not sampled arc
                 control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
 #ifndef CONTROL_LOCAL_PATH
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
                     astar_runtime << runtime_counter << msec << hmpl::endrow;
                     runtime_counter++;
                 }
-                saveStatePath(astar.getDensePath());
+                saveStatePath(astar.getPath()/*getDensePath()*/);
 #endif
 
 #if DEBUG
