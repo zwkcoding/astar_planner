@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 #endif
 
     std::string map_topic;
-    private_nh_.param<std::string>("map_topic", map_topic, "/local_map");
+    private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
 
 
     AstarSearch astar;
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
     while (ros::ok()) {
         ros::spinOnce();
 
-        if (!search_info.getMapSet() || !search_info.getStartSet() /*|| !search_info.getGoalSet()*/) {
+        if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
             loop_rate.sleep();
             continue;
         }
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
         search_info.reset();
 
         // new next goal received and not reached
-        if(search_info.goal_update_flag_ == false && search_info.getGoalSet()) {
+        if(search_info.goal_update_flag_ == false) {
             auto start = std::chrono::system_clock::now();
             // Execute astar search
             bool result = astar.makePlan(search_info.getStartPose().pose, search_info.getGoalPose().pose,
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
             }
         } else {
 
-            ROS_INFO("no goal or goal is reached! waiting for new goal!");
+            ROS_INFO("goal is unaccessible or goal is reached! waiting for new goal!");
 
         }
 
