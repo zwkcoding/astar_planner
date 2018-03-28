@@ -17,7 +17,7 @@ void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
   map_ = *msg;
 
   // TODO: what frame do we use?
-  std::string map_frame = "odom";
+  std::string map_frame = "/odom";
   std::string ogm_frame = msg->header.frame_id;
   // Set transform
   tf::StampedTransform map2ogm_frame;
@@ -31,10 +31,13 @@ void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
     return;
   }
 
+
   tf::Transform map2ogm;
   geometry_msgs::Pose ogm_in_map = astar::transformPose(map_.info.origin, map2ogm_frame);
   tf::poseMsgToTF(ogm_in_map, map2ogm);
   ogm2map_ = map2ogm.inverse();
+
+//  ogm2map_ = map2ogm_frame.inverse();
 
   map_set_ = true;
 }
@@ -81,7 +84,7 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
   if (!map_set_)
     return;
 
-//  ROS_INFO("Subcscribed current pose!");
+  ROS_INFO("Subcscribed current pose!");
 
   std::string global_frame  = "/odom";
   std::string goal_frame  = msg->header.frame_id;
@@ -97,12 +100,14 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
       ROS_ERROR("%s", ex.what());
       return;
   }
-    // Set pose in Global frame
   geometry_msgs::Pose msg_pose = msg->pose.pose;
-  start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_global_.header = msg->header;
+  start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_local_.pose = astar::transformPose(start_pose_global_.pose, ogm2map_);
-  start_pose_local_.header = start_pose_local_.header;
+    double yaw = tf::getYaw(start_pose_local_.pose.orientation);
+    ROS_INFO_THROTTLE(0.5, "search start cell : [%f, %f, %f]", start_pose_local_.pose.position.x,
+              start_pose_local_.pose.position.y, yaw);
+    start_pose_local_.header = start_pose_local_.header;
   if(!last_goal_pose_local_.header.frame_id.empty()) {
     if (sqrt(std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
          + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 3) {
@@ -140,7 +145,11 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   geometry_msgs::Pose msg_pose = msg->pose;
   goal_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   goal_pose_global_.header = msg->header;
-  // first time receive goal command or arrived last goal
+
+    geometry_msgs::Pose tmp = astar::transformPose(goal_pose_global_.pose, ogm2map_);
+  double yaw = tf::getYaw(tmp.orientation);
+    ROS_INFO("search goal cell : [%f, %f, %f]", tmp.position.x, tmp.position.y, yaw);
+    // first time receive goal command or arrived last goal
   if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
     ROS_INFO("last goal is reached or last goal is aborted!");
     goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);

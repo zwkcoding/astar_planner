@@ -775,7 +775,7 @@ bool AstarSearch::setStartNode()
   SimpleNode start_sn(index_x, index_y, index_theta, 0, 0);
 
   // Check if start is valid
-  if (isOutOfRange(index_x, index_y) || !isSingleStateCollisionFreeImproved(start_sn)/*detectCollision(start_sn)*/)
+  if (isOutOfRange(index_x, index_y) /*|| !isSingleStateCollisionFreeImproved(start_sn)*//*detectCollision(start_sn)*/)
     return false;
 
   // Set start node
@@ -803,8 +803,7 @@ bool AstarSearch::setGoalNode()
   int index_theta;
   poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
   auto start = std::chrono::system_clock::now();
-  //todo use adjust by dis tf decend dir
-  clearArea(index_x, index_y);
+
   auto end = std::chrono::system_clock::now();
   auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 //  std::cout << "clear goal neighber cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
@@ -821,6 +820,10 @@ bool AstarSearch::setGoalNode()
   // Check if goal is valid
   if (isOutOfRange(index_x, index_y) || !isSingleStateCollisionFreeImproved(goal_sn)/*|| detectCollision(goal_sn)*/)
     return false;
+
+//    //todo use adjust by dis tf decend dir
+//    clearArea(index_x, index_y);
+
 //  if(detectCollision(goal_sn)) {
 //    ROS_INFO("goal Pose invalid, modifying");
 //    grid_map::Index adjusted_index;

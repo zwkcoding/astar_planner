@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 #endif
 
     std::string map_topic;
-    private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
+    private_nh_.param<std::string>("map_topic", map_topic, "/local_map");
 
 
     AstarSearch astar;
