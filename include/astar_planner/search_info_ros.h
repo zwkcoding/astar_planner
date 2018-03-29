@@ -32,6 +32,7 @@ class SearchInfo
 
   // Reset flags
   void reset();
+  void resetGoalFlag();
 
   // update flag
   bool goal_update_flag_;

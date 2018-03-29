@@ -744,7 +744,7 @@ namespace astar_planner {
 
         // Check if start is valid
         if (isOutOfRange(index_x,
-                         index_y) /*|| !isSingleStateCollisionFreeImproved(start_sn)*//*detectCollision(start_sn)*/)
+                         index_y) || !isSingleStateCollisionFreeImproved(start_sn))
             return false;
 
         // Set start node

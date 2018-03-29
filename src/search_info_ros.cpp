@@ -1,5 +1,5 @@
 #include "astar_planner/search_info_ros.h"
-
+#include <chrono>
 SearchInfo::SearchInfo()
   : map_set_(false)
   , start_set_(false)
@@ -36,8 +36,6 @@ void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
   geometry_msgs::Pose ogm_in_map = astar::transformPose(map_.info.origin, map2ogm_frame);
   tf::poseMsgToTF(ogm_in_map, map2ogm);
   ogm2map_ = map2ogm.inverse();
-
-//  ogm2map_ = map2ogm_frame.inverse();
 
   map_set_ = true;
 }
@@ -85,6 +83,7 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
     return;
 
 //  ROS_INFO("Subcscribed current pose!");
+//    auto start = std::chrono::system_clock::now();
 
   std::string global_frame  = "/odom";
   std::string goal_frame  = msg->header.frame_id;
@@ -115,6 +114,10 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
     }
   }
   start_set_ = true;
+
+//    auto end = std::chrono::system_clock::now();
+//    auto msec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
+//    ROS_INFO_THROTTLE(1, "start pose tf calc msec: %lf", msec);
 }
 
 
@@ -123,7 +126,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   if (!map_set_)
     return;
 
-//  ROS_INFO("Subcscribed goal pose!");
+  ROS_INFO("Subcscribed goal pose!");
 
   // TODO: what frame do we use?
   std::string global_frame  = "/odom";
@@ -169,4 +172,8 @@ void SearchInfo::reset()
   map_set_   = false;
   start_set_ = false;
 //  goal_set_  = false;
+}
+
+void SearchInfo::resetGoalFlag() {
+    goal_set_  = false;
 }

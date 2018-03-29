@@ -94,16 +94,18 @@ int main(int argc, char **argv) {
     ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, false);
 
     tf::TransformListener tf_listener_;
-    ros::Rate loop_rate(10);
+    auto last_timestamp = std::chrono::system_clock::now();
+    ros::Rate loop_rate(100);  // hz
     while (ros::ok()) {
         ros::spinOnce();
 
+        // warn: path send hz depends on map/position msg hz
         if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
             loop_rate.sleep();
             continue;
         }
 
-        // Reset flag
+        // Reset flag : update current start pose and map env
         search_info.reset();
 
         // new next goal received and not reached
@@ -124,7 +126,7 @@ int main(int argc, char **argv) {
                 astar.samplePathByStepLength();
 
                 // convert msg : from path to traj
-                path_pub.publish(astar.getDensePath());
+                path_pub.publish(astar.getPath());
                 nav_msgs::Path tmp = astar.getPath();  // use path, not sampled arc
                 control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
@@ -172,6 +174,13 @@ int main(int argc, char **argv) {
 #endif
 
                 trajectory_pub.publish(trajectory);
+#if DEBUG
+                auto time = std::chrono::system_clock::now();
+                auto msec = std::chrono::duration_cast<std::chrono::microseconds>(time - last_timestamp).count() / 1000.0;
+                ROS_INFO_THROTTLE(1, "control_msg send period: %lf[msec]", msec);
+                last_timestamp = time;
+#endif
+
 #ifdef Time_Profile
                 if (runtime_counter < 101) {
                     astar_runtime << runtime_counter << msec << hmpl::endrow;
@@ -191,10 +200,8 @@ int main(int argc, char **argv) {
                     ROS_INFO("can't find path!");
                 }
                 search_info.goal_update_flag_ = true;
+                search_info.resetGoalFlag(); // enable receive new goal
 
-#if DEBUG
-                astar.publishPoseArray(debug_pose_pub, "/odom"); // debug
-#endif
             }
         } else {
 
@@ -203,7 +210,6 @@ int main(int argc, char **argv) {
         }
 
         astar.reset();
-
         loop_rate.sleep();
     }
 
