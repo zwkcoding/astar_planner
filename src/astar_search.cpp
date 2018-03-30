@@ -20,6 +20,7 @@ namespace astar_planner {
         private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
         private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
         private_nh_.param<double>("allow_offset_distance", offset_distance_, 2);
+        private_nh_.param<bool>("allow_use_last_path", allow_use_last_path_, true);
 
         // initial car geometry parameters
         InitCarGeometry(car_);
@@ -1016,7 +1017,7 @@ namespace astar_planner {
                                                    goal_pose.position.x, goal_pose.position.y);
         if(true == last_result) {
             if(goal_dis_diff < 1) {
-                if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose)) {
+                if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose) && allow_use_last_path_) {
                     ROS_INFO_THROTTLE(1, "use last path !");
                     replan = false;
                     path_ = last_path_;
