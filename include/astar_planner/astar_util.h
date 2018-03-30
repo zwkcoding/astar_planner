@@ -3,6 +3,10 @@
 
 #include <tf/transform_listener.h>
 
+
+#define PLAN_IN_LOCAL_MAP
+#define DEBUG 1
+
 enum class STATUS : uint8_t
 {
   NONE,

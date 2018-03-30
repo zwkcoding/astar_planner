@@ -192,6 +192,10 @@ namespace astar_planner {
             // Transform path to global frame
             tf_pose = map2ogm_ * tf_pose;
 
+            // normalize quaternion
+            tf::Quaternion q = tf_pose.getRotation().normalize();
+            tf_pose.setRotation(q);
+
             // Set path as ros message
             geometry_msgs::PoseStamped ros_pose;
             tf::poseTFToMsg(tf_pose, ros_pose.pose);
@@ -1011,10 +1015,24 @@ namespace astar_planner {
         // update map(distance map) before to judge whether to replan
         updateGridMap(map);
 
+        // convert into global odom frame
+        start_pose_local_.pose = start_pose;
+        start_pose_ = astar::transformPose(start_pose_local_.pose, map2ogm_);
+        goal_pose_local_.pose = goal_pose;
+        goal_pose_ = astar::transformPose(goal_pose_local_.pose, map2ogm_);
+
         // todo last success, current plan choose start point in last path
         // judge whether to replan
+#ifndef PLAN_IN_LOCAL_MAP
         double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y,
                                                    goal_pose.position.x, goal_pose.position.y);
+#else
+        // judge goal is unchanged in global frame
+        double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y,
+                                                   goal_pose_.position.x, goal_pose_.position.y);
+#endif
+
+#ifndef PLAN_IN_LOCAL_MAP
         if(true == last_result) {
             if(goal_dis_diff < 1) {
                 if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose) && allow_use_last_path_) {
@@ -1031,11 +1049,26 @@ namespace astar_planner {
         } else {
             replan = true;
         }
-
-        start_pose_local_.pose = start_pose;
-        start_pose_ = astar::transformPose(start_pose_local_.pose, map2ogm_);
-        goal_pose_local_.pose = goal_pose;
-        goal_pose_ = astar::transformPose(goal_pose_local_.pose, map2ogm_);
+#else
+        if(true == last_result) {
+            std::vector<hmpl::State> local_path;
+            globalPath2LocalPath(last_path_, start_pose_, local_path);
+            if(goal_dis_diff < 1) {
+                if(isSinglePathCollisionFreeImproved(local_path) && pathIsNearOrigin(local_path) && allow_use_last_path_) {
+                    ROS_INFO_THROTTLE(1, "use last path !");
+                    replan = false;
+                    path_ = last_path_;
+                    return true;
+                } else {
+                    replan = true;
+                }
+            } else {
+                replan = true;
+            }
+        } else {
+            replan = true;
+        }
+#endif
 
         auto start = std::chrono::system_clock::now();
         setMap(map);  // todo time costy when map is large!
@@ -1057,8 +1090,12 @@ namespace astar_planner {
 //        end = std::chrono::system_clock::now();
 //        usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
-
+#ifndef PLAN_IN_LOCAL_MAP
         last_goal = goal_pose;
+#else
+        last_goal = goal_pose_;
+#endif
+
         last_result = result;
         return result;
     }
@@ -1290,6 +1327,45 @@ namespace astar_planner {
             return false;
         }
     }
+
+    bool AstarSearch::pathIsNearOrigin(const std::vector<hmpl::State> &path) {
+        double min = 999;
+        if (path.size() > 0) {
+            for (int i = 0; i < path.size(); i++) {
+                double deltax = path[i].x ;
+                double deltay = path[i].y;
+                double dist = sqrt(pow(deltax, 2) + pow(deltay, 2));
+                if (dist < min) {
+                    min = dist;
+                }
+            }
+            if (min > offset_distance_) {
+                return false;
+            } else {
+                return true;
+            }
+        } else {
+            return false;
+        }
+    }
+
+
+    void AstarSearch::globalPath2LocalPath(const nav_msgs::Path &global_path, const geometry_msgs::Pose &vehicle_global_pose,
+                                      std::vector<hmpl::State> &local_path) {
+        hmpl::State ref, target, local_pose;
+        ref.x = vehicle_global_pose.position.x;
+        ref.y = vehicle_global_pose.position.y;
+        ref.z = tf::getYaw(vehicle_global_pose.orientation);
+        for(auto &it : global_path.poses) {
+            target.x = it.pose.position.x;
+            target.y = it.pose.position.y;
+            target.z = tf::getYaw(it.pose.orientation);
+            local_pose =  hmpl::globalToLocal(ref, target);
+            local_path.push_back(local_pose);
+        }
+
+    }
+
 
 
 }

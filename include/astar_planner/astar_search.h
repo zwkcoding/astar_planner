@@ -1,7 +1,6 @@
 #ifndef ASTAR_NAVI_NODE_H
 #define ASTAR_NAVI_NODE_H
 
-#define DEBUG 1
 
 #include <iostream>
 #include <vector>
@@ -69,6 +68,9 @@ class AstarSearch
   bool isSingleStateCollisionFreeImproved(const hmpl::State &current);
   bool isSinglePathCollisionFreeImproved(std::vector<hmpl::State> &curve);
   bool isNearLastPath(const geometry_msgs::Pose &pose);
+  bool pathIsNearOrigin(const std::vector<hmpl::State> &path);
+  void globalPath2LocalPath(const nav_msgs::Path &global_path, const geometry_msgs::Pose &vehicle_global_pose,
+                            std::vector<hmpl::State> &local_path);
 
 
   bool findValidClosePose(const grid_map::GridMap& grid_map,

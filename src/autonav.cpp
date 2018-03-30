@@ -74,8 +74,11 @@ int main(int argc, char **argv) {
 #endif
 
     std::string map_topic;
+#ifndef PLAN_IN_LOCAL_MAP
     private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
-
+#else
+    private_nh_.param<std::string>("map_topic", map_topic, "/explore_entry_map");
+#endif
 
     AstarSearch astar;
     SearchInfo search_info;
@@ -85,7 +88,12 @@ int main(int argc, char **argv) {
     ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
 //    ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
 //    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
+
+#ifndef PLAN_IN_LOCAL_MAP
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
+#else
+    ros::Subscriber goal_sub  = n.subscribe("/local_search_goal", 1, &SearchInfo::goalCallback, &search_info);
+#endif
 
     // ROS publishers
     ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path", 1, false);

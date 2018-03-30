@@ -1,5 +1,7 @@
 #include "astar_planner/search_info_ros.h"
 #include <chrono>
+
+
 SearchInfo::SearchInfo()
   : map_set_(false)
   , start_set_(false)
@@ -109,7 +111,7 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
     start_pose_local_.header = start_pose_local_.header;
   if(!last_goal_pose_local_.header.frame_id.empty()) {
     if (sqrt(std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
-         + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 3) {
+         + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 1.5) {
       goal_update_flag_ = true;
     }
   }
@@ -152,7 +154,8 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
     geometry_msgs::Pose tmp = astar::transformPose(goal_pose_global_.pose, ogm2map_);
   double yaw = tf::getYaw(tmp.orientation);
     ROS_INFO("search goal cell [in global_map coord]: [%f[m], %f[m], %f[degree]]", tmp.position.x, tmp.position.y, yaw * 180 / M_PI);
-    // first time receive goal command or arrived last goal
+#ifndef PLAN_IN_LOCAL_MAP
+  // first time receive goal command or arrived last goal
   if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
     ROS_INFO("last goal is reached or last goal is aborted!");
     goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
@@ -163,6 +166,18 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
     // keep last goal
     goal_pose_local_ = last_goal_pose_local_;
   }
+#else
+    if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
+        ROS_INFO("last goal is reached or last goal is aborted!");
+        goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
+        goal_pose_local_.header = goal_pose_global_.header;
+        last_goal_pose_local_ = goal_pose_local_;
+        goal_update_flag_ = false;
+    }
+    goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
+    goal_pose_local_.header = goal_pose_global_.header;
+
+#endif
 
   goal_set_ = true;
 }
@@ -171,7 +186,9 @@ void SearchInfo::reset()
 {
   map_set_   = false;
   start_set_ = false;
-//  goal_set_  = false;
+#ifdef PLAN_IN_LOCAL_MAP
+  goal_set_  = false;
+#endif
 }
 
 void SearchInfo::resetGoalFlag() {
