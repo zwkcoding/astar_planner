@@ -819,7 +819,7 @@ namespace astar_planner {
             bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
             auto end = std::chrono::system_clock::now();
             auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-//    std::cout << "wavefront cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
+    std::cout << "wavefront cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
 
             if (!wavefront_result) {
                 ROS_WARN("Goal is not reachable by wavefront checking!");

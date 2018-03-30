@@ -88,10 +88,13 @@ inline geometry_msgs::Pose transformPose(geometry_msgs::Pose &pose, tf::Transfor
   // Transform pose
   tf_pose = tf * tf_pose;
 
+  // normalize quaternion
+  tf::Quaternion q = tf_pose.getRotation().normalize();
+  tf_pose.setRotation(q);
+
   // Convert TF pose to ROS pose
   geometry_msgs::Pose ros_pose;
   tf::poseTFToMsg(tf_pose, ros_pose);
-
   return ros_pose;
 }
 
