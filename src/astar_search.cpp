@@ -279,21 +279,38 @@ namespace astar_planner {
                     center_x = x1 + sin(t1) * R;
                     center_y = y1 - cos(t1) * R;
                 }
+
+                double angle = t1 - M_PI_2 < 0 ? t1 - M_PI_2 + 2 * M_PI : t1 - M_PI_2;
+                center_x = x1 - R * cos(angle);
+                center_y = y1 - R * sin(angle);
                 // delta arc length now becomes l
                 double num = l / step;
                 int size = static_cast<int>(num);
                 for (int j = 0; j < size; j++) {
                     double heading = t1 + j * step / l * delta_abs_t;
                     double rotate_angle = j * step / l * delta_abs_t;
-                    ros_pose.pose.position.x = center_x + cos(heading - M_PI / 2.0) * R;
-                    ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0) * R;
-                    // todo checkbug
-//                astar::counterClockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
-//                    ros_pose.pose.position.x = x1;
-//                    ros_pose.pose.position.y = y1;
-                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
+                    ros_pose.pose.position.x = center_x + cos(angle + rotate_angle) * R;
+                    ros_pose.pose.position.y = center_y + sin(angle + rotate_angle) * R;
+//                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                     dense_path_.poses.push_back(ros_pose);
+
                 }
+
+                // delta arc length now becomes l
+//                double num = l / step;
+//                int size = static_cast<int>(num);
+//                for (int j = 0; j < size; j++) {
+//                    double heading = t1 + j * step / l * delta_abs_t;
+//                    double rotate_angle = j * step / l * delta_abs_t;
+//                    ros_pose.pose.position.x = center_x + cos(heading - M_PI / 2.0) * R;
+//                    ros_pose.pose.position.y = center_y + sin(heading - M_PI / 2.0) * R;
+//                    // todo checkbug
+////                astar::counterClockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
+////                    ros_pose.pose.position.x = x1;
+////                    ros_pose.pose.position.y = y1;
+//                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
+//                    dense_path_.poses.push_back(ros_pose);
+//                }
 
             } else {
                 // forward: right turn
@@ -307,21 +324,38 @@ namespace astar_planner {
                     center_x = x1 - sin(t1) * R;
                     center_y = y1 + cos(t1) * R;
                 }
+
+                double angle = t1 - M_PI_2 < 0 ? t1 - M_PI_2 + 2 * M_PI : t1 - M_PI_2;
+                center_x = x1 - R * cos(angle);
+                center_y = y1 - R * sin(angle);
                 // delta arc length now becomes l
                 double num = l / step;
-
                 int size = static_cast<int>(num);
                 for (int j = 0; j < size; j++) {
                     double heading = t1 - j * step / l * delta_abs_t;
                     double rotate_angle = j * step / l * delta_abs_t;
-                    ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0) * R;
-                    ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0) * R;
-//                astar::clockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
-//                    ros_pose.pose.position.x = x1;
-//                    ros_pose.pose.position.y = y1;
-                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
+                    ros_pose.pose.position.x = center_x + cos(angle - rotate_angle) * R;
+                    ros_pose.pose.position.y = center_y + sin(angle - rotate_angle) * R;
+//                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
                     dense_path_.poses.push_back(ros_pose);
+
                 }
+
+//                // delta arc length now becomes l
+//                double num = l / step;
+//
+//                int size = static_cast<int>(num);
+//                for (int j = 0; j < size; j++) {
+//                    double heading = t1 - j * step / l * delta_abs_t;
+//                    double rotate_angle = j * step / l * delta_abs_t;
+//                    ros_pose.pose.position.x = center_x + cos(heading + M_PI / 2.0) * R;
+//                    ros_pose.pose.position.y = center_y + sin(heading + M_PI / 2.0) * R;
+////                astar::clockwiseRotatePoint(center_x, center_y, rotate_angle, x1, y1);
+////                    ros_pose.pose.position.x = x1;
+////                    ros_pose.pose.position.y = y1;
+//                    ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(heading);
+//                    dense_path_.poses.push_back(ros_pose);
+//                }
             }
         }
     }

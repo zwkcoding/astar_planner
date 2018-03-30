@@ -8,6 +8,7 @@ Panels:
         - /Status1
         - /Map1
         - /Path1
+        - /Path1/Offset1
         - /PoseArray1
         - /TF1
         - /TF1/Frames1
@@ -53,7 +54,7 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 25; 255; 0
+      Color: 255; 0; 0
       Enabled: true
       Head Diameter: 0.300000012
       Head Length: 0.200000003
@@ -113,13 +114,13 @@ Visualization Manager:
       Update Interval: 0
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /astar_footprint
       Name: MarkerArray
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Angle Tolerance: 0.100000001
       Class: rviz/Odometry
       Covariance:
@@ -197,11 +198,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Scale: 6.82244492
+      Scale: 12.8928881
       Target Frame: map
       Value: TopDownOrtho (rviz)
-      X: 3.00126457
-      Y: -1.73249757
+      X: 0.12117333
+      Y: -11.0418243
     Saved: ~
 Window Geometry:
   Displays:
@@ -219,5 +220,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1867
-  X: 53
-  Y: 124
+  X: 745
+  Y: 75

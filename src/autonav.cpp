@@ -159,14 +159,15 @@ int main(int argc, char **argv) {
                 trajectory.header.frame_id = "base_link";
                 trajectory.header.stamp = ros::Time::now();
                 for (int i = 0; i < tmp.poses.size(); i++) {
-                    tmp.poses[i].pose = astar::transformPose(tmp.poses[i].pose, world2map);
-                    path_node.position.x = tmp.poses[i].pose.position.x;
-                    path_node.position.y = tmp.poses[i].pose.position.y;
+                    // decide forward before world2map
                     if (tmp.poses[i].pose.position.z == -1) {
                         path_node.forward = 0;  // 0 --> back
                     } else {
                         path_node.forward = 1; // 1 --> forward
                     }
+                    tmp.poses[i].pose = astar::transformPose(tmp.poses[i].pose, world2map);
+                    path_node.position.x = tmp.poses[i].pose.position.x;
+                    path_node.position.y = tmp.poses[i].pose.position.y;
                     path_node.velocity.linear.x = 1.5;
                     trajectory.points.push_back(path_node);
                 }
