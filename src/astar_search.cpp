@@ -28,8 +28,7 @@ namespace astar_planner {
 
     }
 
-    AstarSearch::~AstarSearch() {
-    }
+    AstarSearch::~AstarSearch() = default;
 
     void AstarSearch::resizeNode(int width, int height, int angle_size) {
         nodes_.resize(height);
@@ -182,7 +181,7 @@ namespace astar_planner {
 
         // clear last result path in local frame
         local_path_.clear();
-        while (node != NULL) {
+        while (node != nullptr) {
             // Set tf pose
             tf::Vector3 origin(node->x, node->y, 0);
             tf::Pose tf_pose;
@@ -221,6 +220,11 @@ namespace astar_planner {
         // Reverse the vector to be start to goal order
         std::reverse(path_.poses.begin(), path_.poses.end());
         std::reverse(local_path_.begin(), local_path_.end());
+
+        // adjust first node direciton
+        if( -1 == path_.poses[1].pose.position.z) {
+            path_.poses[0].pose.position.z = -1;
+        }
 
         // Keep path result
         last_path_ = path_;
@@ -681,7 +685,7 @@ namespace astar_planner {
                                 //nodes_[i][j][k].gc     = 0;
                                 nodes_[n][m][k].hc = 0;
                                 nodes_[n][m][k].status = STATUS::NONE;
-                                nodes_[n][m][k].parent = NULL;
+                                nodes_[n][m][k].parent = nullptr;
                             }
                         }
                 }
@@ -704,7 +708,6 @@ namespace astar_planner {
             return;
         }
 
-        tf::Transform map2ogm;
         geometry_msgs::Pose ogm_in_map = astar::transformPose(map_info_.origin, map2ogm_frame);
         tf::poseMsgToTF(ogm_in_map, map2ogm_);
 
@@ -728,7 +731,7 @@ namespace astar_planner {
                         //nodes_[i][j][k].gc     = 0;
                         nodes_[i][j][k].hc = 0;
                         nodes_[i][j][k].status = STATUS::NONE;
-                        nodes_[i][j][k].parent = NULL;
+                        nodes_[i][j][k].parent = nullptr;
                     }
                 }
 
@@ -1212,6 +1215,7 @@ namespace astar_planner {
             x = ind_x * map_info_.resolution + map_info_.origin.position.x;
             y = ind_y * map_info_.resolution + map_info_.origin.position.y;
         }
+        return true;
     }
 
     bool AstarSearch::isSingleStateCollisionFreeImproved(const hmpl::State &current) {
