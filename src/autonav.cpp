@@ -11,7 +11,6 @@
 #include <control_msgs/Trajectory.h>
 
 //#define Time_Profile
-#define CONTROL_LOCAL_PATH
 #include <ros/package.h>
 
 using namespace astar_planner;
@@ -67,17 +66,31 @@ int main(int argc, char **argv) {
     ros::NodeHandle n;
     ros::NodeHandle private_nh_("~");
 
+    std::string node_name = ros::this_node::getName();
 #ifdef Time_Profile
     hmpl::CSVFile astar_runtime("astar_runtime.csv");
     astar_runtime << "index" << "t" << hmpl::endrow;
     int runtime_counter = 0;
 #endif
 
-    std::string map_topic;
+    std::string map_topic, start_pose_topic, goal_pose_topic ;
+    std::string se_result_global_path_send_topic;
+    std::string global_map_frame_name, local_map_frame_name, abso_global_map_frame_name;
+    private_nh_.param<std::string>("global_map_frame_name", global_map_frame_name, "/odom");
+    private_nh_.param<std::string>("local_map_frame_name", local_map_frame_name, "base_link");
+    private_nh_.param<std::string>("abso_global_map_frame_name", abso_global_map_frame_name, "/abso_odom");
+
+    private_nh_.param<std::string>("receive_start_pose_topic_name", start_pose_topic, "/odom");
+    private_nh_.param<std::string>("send_result_global_path_send_topic", se_result_global_path_send_topic, "/global_path");
+
 #ifndef PLAN_IN_LOCAL_MAP
-    private_nh_.param<std::string>("map_topic", map_topic, "/global_map");
+    private_nh_.param<std::string>("re_planner_map_topic_name", map_topic, "/global_map");
+    private_nh_.param<std::string>("re_goal_pose_topic_name", goal_pose_topic, "/move_base_simple/goal");
+
 #else
-    private_nh_.param<std::string>("map_topic", map_topic, "/explore_entry_map");
+    private_nh_.param<std::string>("re_planner_map_topic_name", map_topic, "/explore_entry_map");
+    private_nh_.param<std::string>("re_goal_pose_topic_name", goal_pose_topic, "/local_search_goal");
+
 #endif
 
     AstarSearch astar;
@@ -85,21 +98,14 @@ int main(int argc, char **argv) {
 
     // ROS subscribers
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
-    ros::Subscriber start_sub = n.subscribe("/odom", 1, &SearchInfo::currentPoseCallback, &search_info);
-//    ros::Subscriber goal_sub = n.subscribe("/goal_point", 1, &SearchInfo::goalCallback, &search_info);
-//    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
-
-#ifndef PLAN_IN_LOCAL_MAP
-    ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
-#else
-    ros::Subscriber goal_sub  = n.subscribe("/local_search_goal", 1, &SearchInfo::goalCallback, &search_info);
-#endif
+    ros::Subscriber start_sub = n.subscribe(start_pose_topic, 1, &SearchInfo::currentPoseCallback, &search_info);
+    ros::Subscriber goal_sub  = n.subscribe(goal_pose_topic, 1, &SearchInfo::goalCallback, &search_info);
 
     // ROS publishers
-    ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path", 1, false);
-    ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>("/global_path", 1, false);
-    ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, false);
-    ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, false);
+    ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path_show", 1, false);
+    ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>(se_result_global_path_send_topic, 1, false);
+    ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>(node_name + "debug_pose_array", 1, false);
+    ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>(node_name + "astar_footprint", 1, false);
 
     tf::TransformListener tf_listener_;
     auto last_timestamp = std::chrono::system_clock::now();
@@ -139,24 +145,12 @@ int main(int argc, char **argv) {
                 control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
 #ifndef CONTROL_LOCAL_PATH
-                trajectory.header = tmp.header;
-                for (int i = 0; i < tmp.poses.size(); i++) {
-                    path_node.position.x = tmp.poses[i].pose.position.x;
-                    path_node.position.y = tmp.poses[i].pose.position.y;
-                    if (tmp.poses[i].pose.position.z == -1) {
-                        path_node.forward = 0;  // 0 --> back
-                    } else {
-                        path_node.forward = 1; // 1 --> forward
-                    }
-                    path_node.velocity.linear.x = 1.5;
-                    trajectory.points.push_back(path_node);
-                }
-#else
+
                 // Get transform (map to world in Autoware)
                 tf::StampedTransform world2map;
                 try
                 {
-                    tf_listener_.lookupTransform("base_link", "/odom", ros::Time(0), world2map);
+                    tf_listener_.lookupTransform(abso_global_map_frame_name, global_map_frame_name, ros::Time(0), world2map);
                 }
                 catch (tf::TransformException ex)
                 {
@@ -164,7 +158,36 @@ int main(int argc, char **argv) {
 //                    return;
                 }
 
-                trajectory.header.frame_id = "base_link";
+                trajectory.header.frame_id = global_map_frame_name;
+                trajectory.header.stamp = ros::Time::now();
+                for (int i = 0; i < tmp.poses.size(); i++) {
+                    // decide forward before world2map
+                    if (tmp.poses[i].pose.position.z == -1) {
+                        path_node.forward = 0;  // 0 --> back
+                    } else {
+                        path_node.forward = 1; // 1 --> forward
+                    }
+                    tmp.poses[i].pose = astar::transformPose(tmp.poses[i].pose, world2map);
+                    path_node.position.x = tmp.poses[i].pose.position.x;
+                    path_node.position.y = tmp.poses[i].pose.position.y;
+                    path_node.velocity.linear.x = 1.5;
+                    trajectory.points.push_back(path_node);
+                }
+
+#else
+                // Get transform (map to world in Autoware)
+                tf::StampedTransform world2map;
+                try
+                {
+                    tf_listener_.lookupTransform(local_map_frame_name, global_map_frame_name, ros::Time(0), world2map);
+                }
+                catch (tf::TransformException ex)
+                {
+                    ROS_ERROR("%s", ex.what());
+//                    return;
+                }
+
+                trajectory.header.frame_id = local_map_frame_name;
                 trajectory.header.stamp = ros::Time::now();
                 for (int i = 0; i < tmp.poses.size(); i++) {
                     // decide forward before world2map
@@ -199,8 +222,8 @@ int main(int argc, char **argv) {
 #endif
 
 #if DEBUG
-                astar.publishPoseArray(debug_pose_pub, "/odom");
-                astar.publishFootPrint(footprint_pub_, "/odom");
+                astar.publishPoseArray(debug_pose_pub, global_map_frame_name);
+                astar.publishFootPrint(footprint_pub_, global_map_frame_name);
 //            astar.broadcastPathTF();
 #endif
 

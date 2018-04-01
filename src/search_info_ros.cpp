@@ -3,11 +3,15 @@
 
 
 SearchInfo::SearchInfo()
-  : map_set_(false)
+  : allow_time_delay_(500),
+    map_set_(false)
   , start_set_(false)
   , goal_set_(false)
   , goal_update_flag_(false)
 {
+    pnode_ = ros::NodeHandlePtr(new ros::NodeHandle("~"));
+    pnode_->param<std::string>("global_map_frame_name", global_map_frame_name_, "/odom");
+
 }
 
 SearchInfo::~SearchInfo()
@@ -16,10 +20,15 @@ SearchInfo::~SearchInfo()
 
 void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
 {
+
+  last_receive_map_timestamp_ = ros::WallTime::now();  // tick time
+
   map_ = *msg;
 
-  // TODO: what frame do we use?
-  std::string map_frame = "/odom";
+  planner_map_frame_name_ = map_.header.frame_id;
+  ROS_WARN_STREAM_THROTTLE(15, "planner map frame is :" << planner_map_frame_name_);
+  // first get position in global frame , then transform  into speicial frame
+  std::string map_frame = global_map_frame_name_;
   std::string ogm_frame = msg->header.frame_id;
   // Set transform
   tf::StampedTransform map2ogm_frame;
@@ -48,9 +57,9 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
   if (!map_set_)
     return;
 
-  ROS_INFO("Subcscribed current pose!");
+  ROS_INFO_THROTTLE(5, "Subcscribed current pose!");
 
-  std::string global_frame  = "/odom";
+  std::string global_frame  = global_map_frame_name_;
   std::string goal_frame  = msg->header.frame_id;
 
   // Get transform (map to world in Autoware)
@@ -69,11 +78,9 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
   start_pose_global_.header = msg->header;
   start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_local_.pose    = astar::transformPose(start_pose_global_.pose, ogm2map_);
-  start_pose_local_.header  = start_pose_global_.header;
-  
-  start_pose_global_.header.frame_id = "/odom";
-  start_pose_global_.header.stamp = ros::Time::now();
-  start_pose_local_.header = start_pose_global_.header;
+
+  start_pose_local_.header.stamp = ros::Time::now();
+  start_pose_local_.header.frame_id = planner_map_frame_name_;
   
   start_set_ = true;
 }
@@ -81,13 +88,15 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
 
 void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
 {
-  if (!map_set_)
+    last_receive_position_timestamp_ = ros::WallTime::now();  // tick time
+
+    if (!map_set_)
     return;
 
 //  ROS_INFO("Subcscribed current pose!");
 //    auto start = std::chrono::system_clock::now();
 
-  std::string global_frame  = "/odom";
+  std::string global_frame  = global_map_frame_name_;
   std::string goal_frame  = msg->header.frame_id;
 
    // Get transform (map to world in Autoware)
@@ -106,10 +115,12 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
   start_pose_global_.pose   = astar::transformPose(msg_pose, world2map);
   start_pose_local_.pose = astar::transformPose(start_pose_global_.pose, ogm2map_);
     double yaw = tf::getYaw(start_pose_local_.pose.orientation);
-    ROS_INFO_THROTTLE(0.5, "search start cell[in global_map coord] : [%f[m], %f[m], %f[degree]]", start_pose_local_.pose.position.x,
+    ROS_INFO_THROTTLE(0.5, "search start cell[in planner_map coord] : [%f[m], %f[m], %f[degree]]", start_pose_local_.pose.position.x,
               start_pose_local_.pose.position.y, yaw * 180 / M_PI);
-    start_pose_local_.header = start_pose_local_.header;
-  if(!last_goal_pose_local_.header.frame_id.empty()) {
+    start_pose_local_.header.frame_id = planner_map_frame_name_;
+    start_pose_local_.header.stamp =  ros::Time::now();
+
+    if(!last_goal_pose_local_.header.frame_id.empty()) {
     if (sqrt(std::pow(last_goal_pose_local_.pose.position.x - start_pose_local_.pose.position.x, 2)
          + std::pow(last_goal_pose_local_.pose.position.y - start_pose_local_.pose.position.y, 2)) < 1.5) {
       goal_update_flag_ = true;
@@ -125,13 +136,14 @@ void SearchInfo::currentPoseCallback(const nav_msgs::OdometryConstPtr &msg)
 
 void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 {
+    last_receive_goal_timestamp_ = ros::WallTime::now();  // tick time
   if (!map_set_)
     return;
 
-  ROS_INFO("Subcscribed goal pose!");
+  ROS_INFO_THROTTLE(5, "Subcscribed goal pose!");
 
   // TODO: what frame do we use?
-  std::string global_frame  = "/odom";
+  std::string global_frame  = global_map_frame_name_;
   std::string goal_frame  = msg->header.frame_id;
 
   // Get transform (map to world in Autoware)
@@ -153,7 +165,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 
     geometry_msgs::Pose tmp = astar::transformPose(goal_pose_global_.pose, ogm2map_);
   double yaw = tf::getYaw(tmp.orientation);
-    ROS_INFO("search goal cell [in global_map coord]: [%f[m], %f[m], %f[degree]]", tmp.position.x, tmp.position.y, yaw * 180 / M_PI);
+    ROS_INFO_THROTTLE(5, "search goal cell [in planner_map coord]: [%f[m], %f[m], %f[degree]]", tmp.position.x, tmp.position.y, yaw * 180 / M_PI);
 #ifndef PLAN_IN_LOCAL_MAP
   // first time receive goal command or arrived last goal
   if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
@@ -175,7 +187,8 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
         goal_update_flag_ = false;
     }
     goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
-    goal_pose_local_.header = goal_pose_global_.header;
+    goal_pose_local_.header.stamp = ros::Time::now();
+    goal_pose_local_.header.frame_id =  planner_map_frame_name_;
 
 #endif
 
@@ -184,13 +197,35 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 
 void SearchInfo::reset()
 {
-  map_set_   = false;
-  start_set_ = false;
+    ros::WallTime end = ros::WallTime::now();
+    double map_elapse_time = (end - last_receive_map_timestamp_).toSec() * 1000;
+    double position_elapse_time = (end - last_receive_position_timestamp_).toSec() * 1000;
+    double goal_elapse_time = (end - last_receive_goal_timestamp_).toSec() * 1000;
+    if(map_elapse_time < allow_time_delay_) {
+    map_set_   = true;
+    } else {
+        map_set_   = false;
+        ROS_ERROR("Receive planner map delay exceed time!");
+    }
+    if(position_elapse_time < allow_time_delay_) {
+        start_set_ = true;
+    }else {
+        start_set_   = false;
+        ROS_ERROR("Receive vehicle position delay exceed time!");
+    }
+    if(goal_elapse_time < allow_time_delay_) {
+        goal_set_ = true;
+    }else {
 #ifdef PLAN_IN_LOCAL_MAP
-  goal_set_  = false;
+        goal_set_  = false;
+        ROS_ERROR("Receive goal position delay exceed time!");
 #endif
+    }
+
+
 }
 
 void SearchInfo::resetGoalFlag() {
+    // in plan in global_map, need to spin to wait for new goal
     goal_set_  = false;
 }

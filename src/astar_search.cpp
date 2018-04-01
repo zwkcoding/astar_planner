@@ -6,12 +6,13 @@ namespace astar_planner {
 
         ros::NodeHandle private_nh_("~");
         private_nh_.param<std::string>("path_frame", path_frame_, "/odom");
+        private_nh_.param<bool>("allow_use_last_path", allow_use_last_path_, true);
+        private_nh_.param<bool>("use_back", use_back_, true);
         private_nh_.param<int>("angle_size", angle_size_, 48);
         private_nh_.param<double>("minimum_turning_radius", minimum_turning_radius_, 5);
         private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 70);
         private_nh_.param<double>("goal_radius", goal_radius_, 2);
         private_nh_.param<double>("goal_angle", goal_angle_, 10.0); // unit: degree
-        private_nh_.param<bool>("use_back", use_back_, true);
         private_nh_.param<double>("robot_length", robot_length_, 4.9);
         private_nh_.param<double>("robot_wheelbase", robot_wheelbase_, 2.84);
         private_nh_.param<double>("robot_width", robot_width_, 2.8);
@@ -20,12 +21,13 @@ namespace astar_planner {
         private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
         private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
         private_nh_.param<double>("allow_offset_distance", offset_distance_, 2);
-        private_nh_.param<bool>("allow_use_last_path", allow_use_last_path_, true);
 
         // initial car geometry parameters
         InitCarGeometry(car_);
         // product motion primitive look-up table
         createStateUpdateTable(angle_size_);
+
+
 
     }
 
@@ -717,6 +719,7 @@ namespace astar_planner {
         tf::poseMsgToTF(ogm_in_map, map2ogm_);
 
         // Initialize node according to map size
+        // time-costy for first time!
         if (!node_initialized_) {
             resizeNode(map.info.width, map.info.height, angle_size_);
             node_initialized_ = true;
@@ -728,8 +731,8 @@ namespace astar_planner {
                 size_t og_index = i * map.info.width + j;
                 int cost = map.data[og_index];
 
-                // more than threshold or unknown area
-                if (cost > obstacle_threshold_ || cost < 0) {
+                // more than threshold
+                if (cost > obstacle_threshold_ /*|| cost < 0*/) {
                     nodes_[i][j][0].status = STATUS::OBS;
                 } else {
                     for (int k = 0; k < angle_size_; k++) {
@@ -763,8 +766,9 @@ namespace astar_planner {
                 } else if (100.0 == grid_data(idx_x, idx_y)) {
                     grid_data(idx_x, idx_y) = igm_.OCCUPY;
                 } else {
-                    // view unknown as obstacle
-                    grid_data(idx_x, idx_y) = igm_.OCCUPY;
+//                    grid_data(idx_x, idx_y) = igm_.OCCUPY;
+                    // warn : view unknown as free
+                    grid_data(idx_x, idx_y) = igm_.FREE;
                 }
             }
         }
@@ -881,9 +885,8 @@ namespace astar_planner {
             // Terminate the search if the count reaches a certain value
             ros::WallTime end = ros::WallTime::now();
             float elapse_time = (end - begin).toSec() * 1000;
-            if (elapse_time > 500) {
-                ROS_WARN("Exceed time limit");
-                std::cout << "Exceed time limit: " << (end - begin).toSec() * 1000 << "[ms]" << '\n';
+            if (elapse_time > 100) {
+                ROS_WARN("Astar Exceed time limit in search");
                 return false;
             }
 
@@ -1009,6 +1012,7 @@ namespace astar_planner {
 
     bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose,
                                const nav_msgs::OccupancyGrid &map) {
+        ros::WallTime begin = ros::WallTime::now();
         static bool last_result = false;
         static geometry_msgs::Pose last_goal;
         bool replan = true;
@@ -1085,6 +1089,15 @@ namespace astar_planner {
             ROS_WARN("Invalid goal pose!");
             return false;
         }
+
+        ros::WallTime end0 = ros::WallTime::now();
+        float elapse_time = (end0 - begin).toSec() * 1000;
+        if (elapse_time > 200) {
+            ROS_WARN("Astar search Exceed time limit");
+            return false;
+        }
+
+
 //        start = std::chrono::system_clock::now();
         bool result = search();
 //        end = std::chrono::system_clock::now();

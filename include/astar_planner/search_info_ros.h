@@ -56,6 +56,16 @@ class SearchInfo
   bool start_set_;
   bool goal_set_;
 
+  ros::NodeHandlePtr  pnode_;
+    std::string global_map_frame_name_;
+    std::string planner_map_frame_name_;
+
+    ros::WallTime last_receive_map_timestamp_;
+    ros::WallTime last_receive_position_timestamp_;
+    ros::WallTime last_receive_goal_timestamp_;
+
+    double allow_time_delay_;
+
 
 };
 

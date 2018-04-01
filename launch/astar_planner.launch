@@ -1,25 +1,52 @@
 <?xml version="1.0"?>
 <launch>
+
+<!-- <include file="$(find explore_large_map)/launch/large_map.launch"/> -->
+
+<!-- common param for explore_large_map_pkg -->
+<arg name="local_map_frame_name" value="base_link"/>
+<arg name="global_map_frame_name" value="/odom"/>
+<arg name="abso_global_map_frame_name" value="/abso_odom"/>
+<arg name="plan_in_local_map" value="true"/>
+
+<!-- private param for explore_large_map_pkg : /global_map,/explore_entry_map ; /move_base_simple/goal, /local_search_goal /-->
+<arg name="re_planner_map_topic_name" value="/explore_entry_map"/>
+<arg name="re_goal_pose_topic_name" value="/local_search_goal"/>
+
     <node pkg="astar_planner" type="autonav" name="astar_planner" output="screen" >
-            <param name="map_topic" value="/explore_entry_map" />
-            <param name="allow_use_last_path" value="true" />
-            <param name="use_wavefront_heuristic" value="true" />
-            <param name="use_back" value="true" />
-            <param name="allow_offset_distance" value="2" />
-            <param name="angle_size" value="48" />
-            <param name="angle_size" value="48" />
-            <param name="minimum_turning_radius" value="5" />
-            <param name="obstacle_threshold" value="70" />
-            <param name="goal_radius" value="2" />
-            <param name="goal_angle" value="10" />
-            <param name="robot_length" value="4.9" />
-            <param name="robot_wheelbase" value="2.84" />
-            <param name="robot_width" value="2.8" />
-            <param name="base2back" value="1.09" />
-            <param name="curve_weight" value="1.05" />
-            <param name="reverse_weight" value="2.0" />
+
+        <param name="global_map_frame_name" value="$(arg global_map_frame_name)" />
+        <param name="local_map_frame_name" value="$(arg local_map_frame_name)" />
+        <param name="abso_global_map_frame_name" value="$(arg abso_global_map_frame_name)" />
+
+        <param name="path_frame" value="$(arg global_map_frame_name)" />
+        <param name="receive_start_pose_topic_name" value="/odom" />
+        <param name="send_result_global_path_send_topic" value="/global_path" />
+
+
+        <!--   <param name="re_planner_map_topic_name" value="/global_map" /> -->
+        <!--   <param name="re_goal_pose_topic_name" value="/move_base_simple/goal" /> -->
+       <param name="re_planner_map_topic_name" value="$(arg re_planner_map_topic_name)" />
+       <param name="re_goal_pose_topic_name" value="$(arg re_goal_pose_topic_name)" />
+
+
+        <param name="allow_use_last_path" value="true" />
+        <param name="use_wavefront_heuristic" value="true" />
+        <param name="use_back" value="true" />
+        <param name="allow_offset_distance" value="2" />
+        <param name="angle_size" value="48" />
+        <param name="minimum_turning_radius" value="5" />
+        <param name="obstacle_threshold" value="70" />
+        <param name="goal_radius" value="2" />
+        <param name="goal_angle" value="10" />
+        <param name="robot_length" value="4.9" />
+        <param name="robot_wheelbase" value="2.86" />
+        <param name="robot_width" value="1.95" />
+        <param name="base2back" value="1.09" />
+        <param name="curve_weight" value="1.05" />
+        <param name="reverse_weight" value="2.0" />
 
 
     </node>
-    <node pkg="rviz" type="rviz" name="rviz_astar" args="-d $(find astar_planner)/rviz/astar_planner.rviz"/>
+    <!-- <node pkg="rviz" type="rviz" name="rviz_astar" args="-d $(find astar_planner)/rviz/astar_planner.rviz"/> -->
 </launch>
