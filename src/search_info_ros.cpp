@@ -9,7 +9,7 @@ SearchInfo::SearchInfo()
   , goal_set_(false)
   , goal_update_flag_(false)
 {
-    pnode_ = ros::NodeHandlePtr(new ros::NodeHandle("~"));
+    ros::NodeHandlePtr pnode_ = ros::NodeHandlePtr(new ros::NodeHandle("~"));
     pnode_->param<std::string>("global_map_frame_name", global_map_frame_name_, "/odom");
 
 }
@@ -223,9 +223,4 @@ void SearchInfo::reset()
     }
 
 
-}
-
-void SearchInfo::resetGoalFlag() {
-    // in plan in global_map, need to spin to wait for new goal
-    goal_set_  = false;
 }

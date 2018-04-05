@@ -40,7 +40,7 @@ class AstarSearch
   nav_msgs::Path getPath() {return path_;}
   nav_msgs::Path getDensePath() {return dense_path_;}
   void samplePathByStepLength(double step = 0.1);
-
+  int getStatusCode() {return status_code_;}
  private:
   bool search();
   void resizeNode(int width, int height, int angle_size);
@@ -156,6 +156,7 @@ class AstarSearch
   double offset_distance_;
   bool allow_use_last_path_;
 
+  int status_code_;
 
 
 

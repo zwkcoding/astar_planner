@@ -1012,6 +1012,7 @@ namespace astar_planner {
 
     bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose,
                                const nav_msgs::OccupancyGrid &map) {
+        status_code_ = 0;
         ros::WallTime begin = ros::WallTime::now();
         static bool last_result = false;
         static geometry_msgs::Pose last_goal;
@@ -1054,12 +1055,17 @@ namespace astar_planner {
             replan = true;
         }
 #else
+        // no replan need to meet these conditions:
+        // * allowable
+        // * no collision
+        // * same goal pose
+        // * path near start pose(in global map)
         if(true == last_result) {
             std::vector<hmpl::State> local_path;
             globalPath2LocalPath(last_path_, start_pose_, local_path);
             if(goal_dis_diff < 1) {
                 if(isSinglePathCollisionFreeImproved(local_path) && pathIsNearOrigin(local_path) && allow_use_last_path_) {
-                    ROS_INFO_THROTTLE(1, "use last path !");
+                    ROS_INFO( "use last path !");
                     replan = false;
                     path_ = last_path_;
                     return true;
@@ -1082,11 +1088,13 @@ namespace astar_planner {
 
         if (!setStartNode()) {
             ROS_WARN("Invalid start pose!");
+            status_code_ = 1;
             return false;
         }
 
         if (!setGoalNode()) {
             ROS_WARN("Invalid goal pose!");
+            status_code_ = 2;
             return false;
         }
 
@@ -1094,12 +1102,14 @@ namespace astar_planner {
         float elapse_time = (end0 - begin).toSec() * 1000;
         if (elapse_time > 200) {
             ROS_WARN("Astar search Exceed time limit");
+            status_code_ = 3;
             return false;
         }
 
 
 //        start = std::chrono::system_clock::now();
         bool result = search();
+        if(!result) {status_code_ = 3;}
 //        end = std::chrono::system_clock::now();
 //        usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';

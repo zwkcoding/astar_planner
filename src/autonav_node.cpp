@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
 
                 ROS_INFO_THROTTLE(1, "Found GOAL!");
                 // sample path by constant length
-                astar.samplePathByStepLength();
+//                astar.samplePathByStepLength();
 
                 // convert msg : from path to traj
                 path_pub.publish(astar.getPath());

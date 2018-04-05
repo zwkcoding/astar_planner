@@ -5,16 +5,10 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Status1
-        - /Map1
-        - /Path1
         - /Path1/Offset1
         - /PoseArray1
-        - /MarkerArray1
         - /MarkerArray1/Namespaces1
-        - /Odometry1
         - /Odometry1/Shape1
-        - /Map2
       Splitter Ratio: 0.5
     Tree Height: 747
   - Class: rviz/Selection
@@ -49,6 +43,16 @@ Visualization Manager:
       Unreliable: false
       Use Timestamp: false
       Value: true
+    - Alpha: 0.699999988
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: Map
+      Topic: /explore_entry_map
+      Unreliable: false
+      Use Timestamp: false
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
@@ -69,7 +73,7 @@ Visualization Manager:
       Radius: 0.0299999993
       Shaft Diameter: 0.100000001
       Shaft Length: 0.100000001
-      Topic: /astar_planner/global_path
+      Topic: /global_path
       Unreliable: false
       Value: true
     - Alpha: 1
@@ -130,15 +134,20 @@ Visualization Manager:
       Topic: /odom
       Unreliable: false
       Value: true
-    - Alpha: 0.699999988
-      Class: rviz/Map
-      Color Scheme: map
-      Draw Behind: false
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.100000001
+      Class: rviz/Pose
+      Color: 255; 0; 0
       Enabled: true
-      Name: Map
-      Topic: /explore_entry_map
+      Head Length: 0.300000012
+      Head Radius: 0.300000012
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.200000003
+      Shape: Arrow
+      Topic: /move_base_simple/goal
       Unreliable: false
-      Use Timestamp: false
       Value: true
   Enabled: true
   Global Options:
@@ -163,7 +172,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0.0199982263
+      Angle: 0.369998187
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
@@ -173,11 +182,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Scale: 5.98750925
+      Scale: 22.6206207
       Target Frame: map
       Value: TopDownOrtho (rviz)
-      X: 0.12117333
-      Y: -11.0418243
+      X: 8.26181507
+      Y: 15.8939667
     Saved: ~
 Window Geometry:
   Displays:
@@ -195,5 +204,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1867
-  X: 53
-  Y: 24
+  X: 512
+  Y: 63

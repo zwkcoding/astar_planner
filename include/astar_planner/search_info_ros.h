@@ -34,8 +34,10 @@ class SearchInfo
 
   // Reset flags
   void reset();
-  void resetGoalFlag();
+  void resetGoalFlag() { goal_set_ = false; }
+  void resetReceiveMapFlag() { map_set_ = false; }
 
+  tf::Transform getTfFromOdomToOgm() {return ogm2map_; }
   // update flag
   bool goal_update_flag_;
 
@@ -56,7 +58,6 @@ class SearchInfo
   bool start_set_;
   bool goal_set_;
 
-  ros::NodeHandlePtr  pnode_;
     std::string global_map_frame_name_;
     std::string planner_map_frame_name_;
 
