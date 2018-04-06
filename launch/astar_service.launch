@@ -31,7 +31,7 @@
         <param name="angle_size" value="48" />
         <param name="minimum_turning_radius" value="5" />
         <param name="obstacle_threshold" value="70" />
-        <param name="goal_radius" value="2" />
+        <param name="goal_radius" value="1" />
         <param name="goal_angle" value="10" />
         <param name="robot_length" value="4.9" />
         <param name="robot_wheelbase" value="2.86" />
@@ -42,5 +42,5 @@
 
     </node>
 
-    <node pkg="rviz" type="rviz" name="rviz_astar" args="-d $(find astar_planner)/rviz/astar_planner.rviz"/>
+    <node pkg="rviz" type="rviz" name="rviz_astar" args="-d $(find astar_planner)/rviz/astar_planner_service.rviz"/>
 </launch>

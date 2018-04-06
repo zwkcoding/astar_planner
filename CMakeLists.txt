@@ -60,9 +60,9 @@ add_executable(autonav_node
 target_link_libraries(autonav_node
         ${linked_libs})
 
-add_executable(astar_server_node
+add_executable(astar_action_server_node
         src/astar_action_server_node.cpp)
-target_link_libraries(astar_server_node
+target_link_libraries(astar_action_server_node
         ${linked_libs})
 
 add_executable(get_plan_server_node
@@ -70,7 +70,13 @@ add_executable(get_plan_server_node
 target_link_libraries(get_plan_server_node
         ${linked_libs})
 
+## Test for ROS service and actionlib
 add_executable(get_plan_client_node
         tests/get_plan_client_node.cpp)
 target_link_libraries(get_plan_client_node
+        ${linked_libs})
+
+add_executable(astar_action_client_node
+        tests/astar_action_client_node.cpp)
+target_link_libraries(astar_action_client_node
         ${linked_libs})

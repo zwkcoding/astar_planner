@@ -776,7 +776,7 @@ namespace astar_planner {
         ROS_DEBUG("Created map with size %f x %f m (%i x %i cells).", igm_.maps.getLength().x(),
                   igm_.maps.getLength().y(), igm_.maps.getSize()(0), igm_.maps.getSize()(1));
         igm_.updateDistanceLayerCV();
-        ros::WallTime end = ros::WallTime::now();
+//        ros::WallTime end = ros::WallTime::now();
 //  std::cout << "gridmap process time: " << (end - begin).toSec() * 1000 << "[ms]" << std::endl;
     }
 
@@ -817,11 +817,11 @@ namespace astar_planner {
         int index_y;
         int index_theta;
         poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
-        auto start = std::chrono::system_clock::now();
-
-        auto end = std::chrono::system_clock::now();
-        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-//  std::cout << "clear goal neighber cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
+//        auto start = std::chrono::system_clock::now();
+//
+//        auto end = std::chrono::system_clock::now();
+//        auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+////  std::cout << "clear goal neighber cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
         SimpleNode goal_sn(index_x, index_y, index_theta, 0, 0);
 
 //  grid_map::Index current_index;
@@ -865,8 +865,7 @@ namespace astar_planner {
             bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
             auto end = std::chrono::system_clock::now();
             auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    std::cout << "wavefront cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
-
+            ROS_INFO_THROTTLE(1, "wavefront cost[ms]: %f", usec / 1000.0 );
             if (!wavefront_result) {
                 ROS_WARN("Goal is not reachable by wavefront checking!");
                 return false;
@@ -1065,7 +1064,7 @@ namespace astar_planner {
             globalPath2LocalPath(last_path_, start_pose_, local_path);
             if(goal_dis_diff < 1) {
                 if(isSinglePathCollisionFreeImproved(local_path) && pathIsNearOrigin(local_path) && allow_use_last_path_) {
-                    ROS_INFO( "use last path !");
+                    ROS_INFO_THROTTLE(1, "use last path !");
                     replan = false;
                     path_ = last_path_;
                     return true;
@@ -1137,6 +1136,8 @@ namespace astar_planner {
     }
 
     void AstarSearch::publishFootPrint(const ros::Publisher &pub, const std::string &frame) {
+        static int last_point_nums = 0;
+
         // displayFootprint
         visualization_msgs::Marker marker;
         marker.header.frame_id = frame;
@@ -1161,7 +1162,21 @@ namespace astar_planner {
             marker_array.markers.push_back(marker);
             marker.id += 1;
         }
+
+        // delete old markers, latest show for debug
+        if(last_point_nums > path_.poses.size()) {
+            for (int i = path_.poses.size(); i < last_point_nums; i++) {
+                visualization_msgs::Marker marker;
+                marker.ns = "footprint";
+                marker.id = i;
+                marker.action = visualization_msgs::Marker::DELETE;
+                marker_array.markers.push_back(marker);
+            }
+        }
+
         pub.publish(marker_array);
+        // keep last marker numbers
+        last_point_nums = path_.poses.size();
     }
 
 // for demo

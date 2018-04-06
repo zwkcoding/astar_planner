@@ -28,7 +28,7 @@ void convertIntoPlannerOgm(geometry_msgs::PoseStamped &msg, geometry_msgs::Pose 
     std::string global_frame  = global_map_frame_name;
     std::string goal_frame  = msg.header.frame_id;
 
-    // Get transform (map to world in Autoware)
+    // First, transform into global_map("/odom")
     tf::StampedTransform world2map;
     try
     {
@@ -57,30 +57,29 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
     convertIntoPlannerOgm(global_start_pose, local_start_pose);
     convertIntoPlannerOgm(global_goal_pose, local_goal_pose);
 
-    ROS_INFO("request start pose in odom frame: x=%f, y=%f, theta=%f", req.start.position.x, req.start.position.y, tf::getYaw(req.start.orientation) * 180 / M_PI);
-    ROS_INFO("request start pose in planner frame: x=%f, y=%f, theta=%f", local_start_pose.position.x, local_start_pose.position.y, tf::getYaw(local_start_pose.orientation) * 180 / M_PI);
+    ROS_INFO_THROTTLE(5,"request start pose in odom frame: x=%f, y=%f, theta=%f", req.start.position.x, req.start.position.y, tf::getYaw(req.start.orientation) * 180 / M_PI);
+    ROS_INFO_THROTTLE(5,"request start pose in planner ogm map: x=%f, y=%f, theta=%f", local_start_pose.position.x, local_start_pose.position.y, tf::getYaw(local_start_pose.orientation) * 180 / M_PI);
 
-    ROS_INFO("request goal pose in odom frame: x=%f, y=%f, theta=%f", req.goal.position.x, req.goal.position.y, tf::getYaw(req.goal.orientation) * 180 / M_PI);
-    ROS_INFO("request goal pose in planner frame: x=%f, y=%f, theta=%f", local_goal_pose.position.x, local_goal_pose.position.y, tf::getYaw(local_goal_pose.orientation) * 180 / M_PI);
+    ROS_INFO_THROTTLE(5, "request goal pose in odom frame: x=%f, y=%f, theta=%f", req.goal.position.x, req.goal.position.y, tf::getYaw(req.goal.orientation) * 180 / M_PI);
+    ROS_INFO_THROTTLE(5, "request goal pose in planner ogm map: x=%f, y=%f, theta=%f", local_goal_pose.position.x, local_goal_pose.position.y, tf::getYaw(local_goal_pose.orientation) * 180 / M_PI);
 
     if(search_info_ptr->getMapSet()) {
-        // reset receive_map flag
+        // reset receive_map flag considering time delay
         search_info_ptr->resetReceiveMapFlag();
 
         // Execute astar search
         auto start = std::chrono::system_clock::now();
-        bool search_result = false;
-        search_result = as_planner_ptr->makePlan(local_start_pose, local_goal_pose, search_info_ptr->getMap());
+        bool search_result = as_planner_ptr->makePlan(local_start_pose, local_goal_pose, search_info_ptr->getMap());
         auto end = std::chrono::system_clock::now();
         auto msec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
-        ROS_INFO("astar msec: %lf", msec);
+        ROS_INFO_THROTTLE(3, "astar msec: %lf", msec);
 
         if (search_result) {
-            ROS_INFO("Found GOAL!");
+            ROS_INFO_THROTTLE(5, "Found GOAL!");
             // sample path by constant length
 //            as_planner.samplePathByStepLength();
 
-            // transform path into special path, still
+            // transform path into "control" path
             nav_msgs::Path tmp = as_planner_ptr->getPath();  // use path, not sampled arc
             path_pub.publish(tmp);
             control_msgs::Traj_Node path_node;
@@ -144,7 +143,7 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
             }
 
 #endif
-
+            ROS_INFO_THROTTLE(3, "Path node size is %d", trajectory.points.size());
             res.path = trajectory;
 #ifdef DEBUG
             as_planner_ptr->publishPoseArray(debug_pose_pub, global_map_frame_name);
@@ -152,15 +151,15 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
 #endif
             res.status_code = 0;
         } else {
+            ROS_INFO("Fail to find GOAL!");
             // 0 --> success; 1 --> invaid start pose; 2 --> invaid goal pose; 3 --> time exceed
             res.status_code = as_planner_ptr->getStatusCode();
+            ROS_INFO("Planner Fail status code : %d", res.status_code);
+
         }
-        // clear astar_planner search cache path
+        // clear astar_planner search cache path in any condition: even fail
         as_planner_ptr->reset();
-
-        ROS_INFO("Planner status: %d", res.status_code);
         return true;
-
     } else {
         ROS_WARN("No planning maps received!");
         return false;
@@ -187,9 +186,9 @@ int main(int argc, char **argv) {
     ros::Subscriber map_sub = nh_.subscribe(receive_planner_map_topic_name, 1, &SearchInfo::mapCallback, search_info_ptr);
     ServiceServer local_map_srv = nh_.advertiseService("get_plan", localPlanCallback);
 
-    path_pub = nh_.advertise<nav_msgs::Path>("global_path", 1, false);
-    debug_pose_pub = nh_.advertise<geometry_msgs::PoseArray>("debug_pose_array", 1, false);
-    footprint_pub = nh_.advertise<visualization_msgs::MarkerArray>("astar_footprint", 1, false);
+    path_pub = nh_.advertise<nav_msgs::Path>(nh_.getNamespace() + "global_path_show", 1, false);
+    debug_pose_pub = nh_.advertise<geometry_msgs::PoseArray>(nh_.getNamespace() + "debug_pose_array", 1, false);
+    footprint_pub = nh_.advertise<visualization_msgs::MarkerArray>(nh_.getNamespace() + "astar_footprint", 1, false);
 
     spin();
     return 0;

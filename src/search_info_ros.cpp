@@ -3,7 +3,7 @@
 
 
 SearchInfo::SearchInfo()
-  : allow_time_delay_(500),
+  : allow_time_delay_(1000),
     map_set_(false)
   , start_set_(false)
   , goal_set_(false)
@@ -11,6 +11,7 @@ SearchInfo::SearchInfo()
 {
     ros::NodeHandlePtr pnode_ = ros::NodeHandlePtr(new ros::NodeHandle("~"));
     pnode_->param<std::string>("global_map_frame_name", global_map_frame_name_, "/odom");
+    pnode_->param<double>("allow_time_transmission_delay_ms_", allow_time_delay_, 1000);
 
 }
 
@@ -223,4 +224,15 @@ void SearchInfo::reset()
     }
 
 
+}
+
+void SearchInfo::resetReceiveMapFlag() {
+    ros::WallTime end = ros::WallTime::now();
+    double map_elapse_time = (end - last_receive_map_timestamp_).toSec() * 1000;
+    if(map_elapse_time < allow_time_delay_) {
+        map_set_   = true;
+    } else {
+        map_set_   = false;
+        ROS_ERROR("Receive planner map delay exceed time!");
+    }
 }

@@ -35,7 +35,7 @@ class SearchInfo
   // Reset flags
   void reset();
   void resetGoalFlag() { goal_set_ = false; }
-  void resetReceiveMapFlag() { map_set_ = false; }
+  void resetReceiveMapFlag();
 
   tf::Transform getTfFromOdomToOgm() {return ogm2map_; }
   // update flag

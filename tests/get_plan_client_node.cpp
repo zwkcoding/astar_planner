@@ -48,9 +48,11 @@ int main(int argc, char **argv) {
 //    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, startCallback);
     ros::Subscriber start_sub = n.subscribe("/odom", 1, currentPoseCallback);
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, goalPoseCallback);
-    ros::ServiceClient plan_client = n.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"));
+    // true:  a persistent connection
+    ros::ServiceClient plan_client = n.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
+    ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>("/global_path", 1, false);
 
-    ros::Rate rate(10);
+    ros::Rate rate(100);
     while(n.ok()) {
         ros::spinOnce();
         if(!start_flag || !goal_flag) {
@@ -63,12 +65,13 @@ int main(int argc, char **argv) {
         srv.request.start = global_start_pose;
         srv.request.goal = global_goal_pose;
         if (!plan_client.isValid()) {
-            ROS_WARN("astar planner service client is invaild!");
+            ROS_WARN("persistent astar planner service has dropped !");
             continue;
         }
         if (plan_client.call(srv)) {
             if (0 == srv.response.status_code) {
                 result_path = srv.response.path;
+                trajectory_pub.publish(result_path);
                 ROS_INFO("FIND GOAL!, Path size is %d", result_path.points.size());
             }
             ROS_INFO("Planner status: %d",srv.response.status_code);
