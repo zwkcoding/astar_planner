@@ -126,7 +126,7 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
 //                    return;
             }
 
-            trajectory.header.frame_id = global_map_frame_name;
+            trajectory.header.frame_id = local_map_frame_name;
             trajectory.header.stamp = ros::Time::now();
             for (int i = 0; i < tmp.poses.size(); i++) {
                 // decide forward before world2map

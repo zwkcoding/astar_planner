@@ -34,6 +34,7 @@ public:
 //        vehicle_pose_sub_ = nh_.subscribe("/vehicle_global_pose_topic", 1, &AstarAction::currentPoseCallback, this);
         // ROS publisher
         control_trajectory_pub_ = nh_.advertise<control_msgs::Trajectory>("/global_path", 1, false);
+        current_goal_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/current_goal", 1, false);
         // ROS service client
         // persistent connection
         plan_client_ = nh_.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
@@ -92,6 +93,17 @@ public:
 
         // get current vehicle position
         getCurrentPosition();
+
+        // prepare for service up
+        ros::Duration timeout(0.5);
+        bool service_up = plan_client_.waitForExistence(timeout);
+        if(!service_up) {
+            ROS_ERROR("astar service is not up at Now!");
+            return;
+        }
+        plan_client_ = nh_.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
+
+
         // Note: no need to execute following code under condition:
         // * no accessible goals at first, or choose goals is unaccessible now
         // * astar planner service has no plan map
@@ -108,14 +120,14 @@ public:
                     iv_explore_msgs::GetAstarPlan srv;
                     srv.request.start = current_vehicle_pose_;
                     srv.request.goal = goal_list_[i];
-                    if (plan_client_) {
+                    if (plan_client_.isValid()) {
                         if (plan_client_.call(srv)) {
                             if (0 == srv.response.status_code) {
                                 result_path_ = srv.response.path;
                                 // record vaild goal_pose
                                 goal_pose_ = goal_list_[i];
                                 choose_path_flag = true;
-                                ROS_INFO("%d of %d goal is chosen!", i, goal_list_.size());
+                                ROS_WARN("%d of %d goal is chosen!", i, goal_list_.size());
                                 // publisher feedback
                                 feedback_.current_goal = goal_pose_;
                                 as_.publishFeedback(feedback_);
@@ -130,6 +142,9 @@ public:
                         }
                     } else {
                         ROS_ERROR("astar planner service persistent connection failed !");
+                        plan_client_.waitForExistence();
+                        plan_client_ = nh_.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
+
                         as_.setPreempted();
                         need_path_plan = false;
                         return;
@@ -138,7 +153,7 @@ public:
                 // The worst result: all goal points fail
                 if (false == choose_path_flag) {
                     ROS_WARN("All goal point is unavailable !");
-                    ROS_INFO("%s: Aborted", action_name_.c_str());
+                    ROS_WARN("%s: Aborted", action_name_.c_str());
                     result_.success_flag = false;
                     //set the action state to aborted
                     as_.setAborted(result_);
@@ -146,11 +161,17 @@ public:
                     return;
                 }
             } else {
+                // publish current goal
+                geometry_msgs::PoseStamped goal;
+                goal.pose = goal_pose_;
+                goal.header.frame_id = global_map_frame_name_;
+                goal.header.stamp = ros::Time::now();
+                current_goal_pub_.publish(goal);
                 // found a vaild goal point
                 iv_explore_msgs::GetAstarPlan srv;
                 srv.request.start = current_vehicle_pose_;
                 srv.request.goal = goal_pose_;
-                if (plan_client_) {
+                if (plan_client_.isValid()) {
                     if (plan_client_.call(srv)) {
                         if (0 == srv.response.status_code) {
                             result_path_ = srv.response.path;
@@ -164,7 +185,7 @@ public:
                         } else {
                             result_path_.points.clear();  // stop here, hesitate
                             ROS_WARN("search start or goal pose is BAD !, No hesitate, Give up!");
-                            ROS_INFO("%s: Aborted", action_name_.c_str());
+                            ROS_WARN("%s: Aborted", action_name_.c_str());
                             result_.success_flag = false;
                             //set the action state to aborted
                             as_.setAborted(result_);
@@ -173,13 +194,16 @@ public:
                         }
                     } else {
                         ROS_WARN("astar planner service callback fail : Could not get a planner map.");
-                        ROS_INFO("%s: Aborted", action_name_.c_str());
+                        ROS_WARN("%s: Aborted", action_name_.c_str());
                         as_.setPreempted();
                         need_path_plan = false;
                         return;
                     }
                 } else {
                     ROS_ERROR("astar planner service persistent connection failed !");
+                    plan_client_.waitForExistence();
+                    plan_client_ = nh_.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
+
                     as_.setPreempted();
                     need_path_plan = false;
                     return;
@@ -189,7 +213,7 @@ public:
                 if (path_search_fail_counter > 10) {
                     path_search_fail_counter = 0;
                     ROS_WARN("choose goal is unavailable now, exceed max awaiting time, Give up!");
-                    ROS_INFO("%s: Aborted", action_name_.c_str());
+                    ROS_WARN("%s: Aborted", action_name_.c_str());
                     result_.success_flag = false;
                     //set the action state to aborted
                     as_.setAborted(result_);
@@ -207,9 +231,10 @@ public:
                 if (dis2goal < distance_threhold_to_goal_) {
                     result_.success_flag = true;
                     as_.setSucceeded(result_);
-                    ROS_INFO("%s: Succeed!", action_name_.c_str());
+                    ROS_WARN("%s: Succeed!", action_name_.c_str());
                     need_path_plan = false;
                 }
+
 
             }
         }
@@ -254,6 +279,8 @@ private:
 
     ros::Subscriber vehicle_pose_sub_;
     ros::Publisher control_trajectory_pub_;
+    ros::Publisher current_goal_pub_;
+
     ros::ServiceClient plan_client_;
     ros::Timer update_path_timer_;
     tf::TransformListener tf_listener_;

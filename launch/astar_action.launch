@@ -42,7 +42,7 @@
             <param name="minimum_turning_radius" value="5" />
             <param name="obstacle_threshold" value="70" />
             <param name="goal_radius" value="1" />
-            <param name="goal_angle" value="10" />
+            <param name="goal_angle" value="150" />
             <param name="robot_length" value="4.9" />
             <param name="robot_wheelbase" value="2.86" />
             <param name="robot_width" value="1.95" />

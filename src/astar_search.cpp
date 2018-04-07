@@ -884,7 +884,7 @@ namespace astar_planner {
             // Terminate the search if the count reaches a certain value
             ros::WallTime end = ros::WallTime::now();
             float elapse_time = (end - begin).toSec() * 1000;
-            if (elapse_time > 100) {
+            if (elapse_time > 200) {
                 ROS_WARN("Astar Exceed time limit in search");
                 return false;
             }
@@ -1069,6 +1069,7 @@ namespace astar_planner {
                     path_ = last_path_;
                     return true;
                 } else {
+                    ROS_INFO("not use last path !");
                     replan = true;
                 }
             } else {
@@ -1099,7 +1100,7 @@ namespace astar_planner {
 
         ros::WallTime end0 = ros::WallTime::now();
         float elapse_time = (end0 - begin).toSec() * 1000;
-        if (elapse_time > 200) {
+        if (elapse_time > 500) {
             ROS_WARN("Astar search Exceed time limit");
             status_code_ = 3;
             return false;
