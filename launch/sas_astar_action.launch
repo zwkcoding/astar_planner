@@ -43,31 +43,22 @@
 
     </node>
 
-    <node pkg="astar_planner" type="get_plan_server_node" name="get_plan_server_node" output="screen" >
-            <param name="receive_planner_map_topic_name" value="$(arg re_planner_map_topic_name)" />
-            <param name="global_map_frame_name" value="$(arg global_map_frame_name)" />
-            <param name="local_map_frame_name" value="$(arg local_map_frame_name)" />
-            <param name="abso_global_map_frame_name" value="$(arg abso_global_map_frame_name)" />
+     <arg name="config" default="$(find sas_space_explore)/cfg/params.yaml" />
+      <env name="ROSCONSOLE_CONFIG_FILE"
+             value="$(find sas_space_explore)/cfg/custom_rosconsole.conf"/>
+      <node pkg="sas_space_explore" type="get_plan_server_node" name="get_plan_server_node" output="screen">
+        <rosparam command="load" file="$(arg config)"/>
+        <param name="angle_size" value="32" />
+        <param name="heading_size" value="32" />
+        <param name="allow_use_last_path" value="true" />
+        <param name="allow_offset_distance" value="2" />
+      </node>
+
+       <node pkg="rviz" type="rviz" name="rviz" args="-d $(find sas_space_explore)/rviz/sas_explore_node_viz.rviz"/>
+       <node pkg="rqt_reconfigure"  type="rqt_reconfigure" name="reconfigure_gui"/>
+       <node pkg="dynamic_reconfigure" type="dynparam" name="dynparam" args="load /get_plan_server_node $(find sas_space_explore)/cfg/dynamic_params.yaml"/>
 
 
-            <param name="allow_time_transmission_delay_ms_" value="$(arg allow_time_transmission_delay_ms_)" />
-            <param name="path_frame" value="$(arg global_map_frame_name)" />
-            <param name="allow_use_last_path" value="true" />
-            <param name="use_wavefront_heuristic" value="true" />
-            <param name="use_back" value="true" />
-            <param name="allow_offset_distance" value="1.5" />
-            <param name="angle_size" value="48" />
-            <param name="minimum_turning_radius" value="$(arg minimum_turning_radius)" />
-            <param name="obstacle_threshold" value="70" />
-            <param name="goal_radius" value="1" />
-            <param name="goal_angle" value="150" />
-            <param name="robot_length" value="$(arg robot_length)" />
-            <param name="robot_wheelbase" value="$(arg robot_wheelbase)" />
-            <param name="robot_width" value="$(arg robot_width)" />
-            <param name="base2back" value="$(arg base2back)" />
-            <param name="curve_weight" value="1.05" />
-            <param name="reverse_weight" value="3.0" />
-    </node>
 
     <!--
     <node pkg="rviz" type="rviz" name="rviz_astar" args="-d $(find astar_planner)/rviz/astar_planner_service.rviz"/>

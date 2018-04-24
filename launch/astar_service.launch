@@ -10,7 +10,7 @@
 <arg name="plan_in_local_map" value="true"/>
 
 <!-- private param for explore_large_map_pkg : /global_map,/explore_entry_map ; /move_base_simple/goal, /local_search_goal /-->
-<arg name="re_planner_map_topic_name" value="/explore_entry_map"/>
+<arg name="re_planner_map_topic_name" value="/global_map"/>
 <arg name="re_goal_pose_topic_name" value="/local_search_goal"/>
 
     <node pkg="astar_planner" type="get_plan_client_node" name="get_plan_client_node" output="screen" >
@@ -24,7 +24,7 @@
         <param name="abso_global_map_frame_name" value="$(arg abso_global_map_frame_name)" />
 
         <param name="path_frame" value="$(arg global_map_frame_name)" />
-        <param name="allow_use_last_path" value="true" />
+        <param name="allow_use_last_path" value="false" />
         <param name="use_wavefront_heuristic" value="true" />
         <param name="use_back" value="true" />
         <param name="allow_offset_distance" value="2" />

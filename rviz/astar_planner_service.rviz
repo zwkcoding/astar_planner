@@ -49,7 +49,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: Map
-      Topic: /explore_entry_map
+      Topic: /global_map
       Unreliable: false
       Use Timestamp: false
       Value: true
@@ -182,11 +182,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Scale: 12.1853342
+      Scale: 11.1697025
       Target Frame: map
       Value: TopDownOrtho (rviz)
-      X: -9.46921635
-      Y: 0.571966529
+      X: 3.82545471
+      Y: 17.3134022
     Saved: ~
 Window Geometry:
   Displays:

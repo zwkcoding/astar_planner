@@ -30,10 +30,13 @@ public:
         private_nh_.param<double>("path_plan_update_cycle_", path_update_rate_, 0.2);
         private_nh_.param<double>("distance_threhold_to_goal_", distance_threhold_to_goal_, 2);
 
+        std::string path_topic_name;
+        private_nh_.param<std::string>("send_path_topic_name", path_topic_name, "/trajectory");
+
         // ROS subscribers
 //        vehicle_pose_sub_ = nh_.subscribe("/vehicle_global_pose_topic", 1, &AstarAction::currentPoseCallback, this);
         // ROS publisher
-        control_trajectory_pub_ = nh_.advertise<control_msgs::Trajectory>("/global_path", 1, false);
+        control_trajectory_pub_ = nh_.advertise<control_msgs::Trajectory>(path_topic_name, 1, false);
         current_goal_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/current_goal", 1, false);
         // ROS service client
         // persistent connection

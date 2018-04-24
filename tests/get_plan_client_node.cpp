@@ -33,6 +33,19 @@ void startCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg) 
 
 void currentPoseCallback(const nav_msgs::OdometryConstPtr &msg) {
     global_start_pose = msg->pose.pose;
+    // for vrep, convert pose into odom frame
+    static int count = 0;
+    static double base_x, base_y;
+    if(0 == count) {
+        base_x = global_start_pose.position.x;
+        base_y = global_start_pose.position.y;
+        global_start_pose.position.x -= base_x;
+        global_start_pose.position.y -= base_y;
+        count = 1;
+    }
+    global_start_pose.position.x -= base_x;
+    global_start_pose.position.y -= base_y;
+
     start_flag = true;
 }
 
@@ -49,7 +62,7 @@ int main(int argc, char **argv) {
     ros::Subscriber start_sub = n.subscribe("/odom", 1, currentPoseCallback);
     ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, goalPoseCallback);
     // true:  a persistent connection
-    ros::ServiceClient plan_client = n.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"), true);
+    ros::ServiceClient plan_client = n.serviceClient<iv_explore_msgs::GetAstarPlan>(std::string("get_plan"));
     ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>("/global_path", 1, false);
 
     ros::Rate rate(100);

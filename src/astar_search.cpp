@@ -865,7 +865,7 @@ namespace astar_planner {
             bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
             auto end = std::chrono::system_clock::now();
             auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-            ROS_INFO_THROTTLE(1, "wavefront cost[ms]: %f", usec / 1000.0 );
+            ROS_DEBUG("wavefront cost[ms]: %f", usec / 1000.0 );
             if (!wavefront_result) {
                 ROS_WARN("Goal is not reachable by wavefront checking!");
                 return false;
@@ -1019,7 +1019,7 @@ namespace astar_planner {
         // update map(distance map) before to judge whether to replan
         updateGridMap(map);
 
-        // convert into global odom frame
+        // convert planner ogm frame into global odom frame
         start_pose_local_.pose = start_pose;
         start_pose_ = astar::transformPose(start_pose_local_.pose, map2ogm_);
         goal_pose_local_.pose = goal_pose;
@@ -1027,27 +1027,25 @@ namespace astar_planner {
 
         // todo last success, current plan choose start point in last path
         // judge whether to replan
-#ifndef PLAN_IN_LOCAL_MAP
-        double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y,
-                                                   goal_pose.position.x, goal_pose.position.y);
-#else
+
         // judge goal is unchanged in global frame
         double goal_dis_diff = astar::calcDistance(last_goal.position.x, last_goal.position.y,
                                                    goal_pose_.position.x, goal_pose_.position.y);
-#endif
 
 #ifndef PLAN_IN_LOCAL_MAP
         if(true == last_result) {
             if(goal_dis_diff < 1) {
-                if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose) && allow_use_last_path_) {
+                if(isSinglePathCollisionFreeImproved(local_path_) && isNearLastPath(start_pose_) && allow_use_last_path_) {
                     ROS_INFO_THROTTLE(1, "use last path !");
                     replan = false;
                     path_ = last_path_;
                     return true;
                 } else {
+                    ROS_INFO("Fail to use last path : collision or far away path");
                     replan = true;
                 }
             } else {
+                ROS_INFO("Fail to use last path : goal is not same");
                 replan = true;
             }
         } else {
@@ -1064,15 +1062,16 @@ namespace astar_planner {
             globalPath2LocalPath(last_path_, start_pose_, local_path);
             if(goal_dis_diff < 1) {
                 if(isSinglePathCollisionFreeImproved(local_path) && pathIsNearOrigin(local_path) && allow_use_last_path_) {
-                    ROS_INFO_THROTTLE(1, "use last path !");
+                    ROS_INFO("use last path !");
                     replan = false;
                     path_ = last_path_;
                     return true;
                 } else {
-                    ROS_INFO("not use last path !");
+                    ROS_INFO("Fail to use last path : collision or far away path");
                     replan = true;
                 }
             } else {
+                ROS_INFO("Fail to use last path : goal is not same");
                 replan = true;
             }
         } else {
@@ -1084,17 +1083,19 @@ namespace astar_planner {
         setMap(map);  // todo time costy when map is large!
         auto end = std::chrono::system_clock::now();
         auto usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-        ROS_INFO_STREAM_THROTTLE(1, "map update cost time[ms]:" << usec / 1000.0);
+        ROS_DEBUG("map update cost time[ms]:%f ", usec / 1000.0);
 
         if (!setStartNode()) {
             ROS_WARN("Invalid start pose!");
             status_code_ = 1;
+            last_result = false;
             return false;
         }
 
         if (!setGoalNode()) {
             ROS_WARN("Invalid goal pose!");
             status_code_ = 2;
+            last_result = false;
             return false;
         }
 
@@ -1103,6 +1104,7 @@ namespace astar_planner {
         if (elapse_time > 500) {
             ROS_WARN("Astar search Exceed time limit");
             status_code_ = 3;
+            last_result = false;
             return false;
         }
 
@@ -1113,11 +1115,8 @@ namespace astar_planner {
 //        end = std::chrono::system_clock::now();
 //        usec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 //  std::cout << "astar search process cost: " << usec / 1000.0 <<  "[ms]" <<  '\n';
-#ifndef PLAN_IN_LOCAL_MAP
-        last_goal = goal_pose;
-#else
+
         last_goal = goal_pose_;
-#endif
 
         last_result = result;
         return result;
@@ -1331,19 +1330,7 @@ namespace astar_planner {
         return true;
     }
 
-    bool AstarSearch::isNearLastPath(const geometry_msgs::Pose &pose) {
-        // convert pose in ogm into odom
-        tf::Vector3 origin(pose.position.x, pose.position.y, 0);
-        tf::Pose tf_pose;
-        tf_pose.setOrigin(origin);
-        tf::Quaternion q;
-        tf::quaternionMsgToTF(pose.orientation, q);
-        tf_pose.setRotation(q);
-        // Transform path to global frame
-        tf_pose = map2ogm_ * tf_pose;
-        // Set path as ros message
-        geometry_msgs::Pose ros_pose;
-        tf::poseTFToMsg(tf_pose, ros_pose);
+    bool AstarSearch::isNearLastPath(const geometry_msgs::Pose &ros_pose) {
 
         int index_min = -1;
         double min = 999;

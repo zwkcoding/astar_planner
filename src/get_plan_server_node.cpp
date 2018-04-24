@@ -57,11 +57,11 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
     convertIntoPlannerOgm(global_start_pose, local_start_pose);
     convertIntoPlannerOgm(global_goal_pose, local_goal_pose);
 
-    ROS_INFO_THROTTLE(5,"request start pose in odom frame: x=%f, y=%f, theta=%f", req.start.position.x, req.start.position.y, tf::getYaw(req.start.orientation) * 180 / M_PI);
-    ROS_INFO_THROTTLE(5,"request start pose in planner ogm map: x=%f, y=%f, theta=%f", local_start_pose.position.x, local_start_pose.position.y, tf::getYaw(local_start_pose.orientation) * 180 / M_PI);
+  //  ROS_INFO_THROTTLE(5,"request start pose in odom frame: x=%f, y=%f, theta=%f", req.start.position.x, req.start.position.y, tf::getYaw(req.start.orientation) * 180 / M_PI);
+  //  ROS_INFO_THROTTLE(5,"request start pose in planner ogm map: x=%f, y=%f, theta=%f", local_start_pose.position.x, local_start_pose.position.y, tf::getYaw(local_start_pose.orientation) * 180 / M_PI);
 
-    ROS_INFO_THROTTLE(5, "request goal pose in odom frame: x=%f, y=%f, theta=%f", req.goal.position.x, req.goal.position.y, tf::getYaw(req.goal.orientation) * 180 / M_PI);
-    ROS_INFO_THROTTLE(5, "request goal pose in planner ogm map: x=%f, y=%f, theta=%f", local_goal_pose.position.x, local_goal_pose.position.y, tf::getYaw(local_goal_pose.orientation) * 180 / M_PI);
+  //  ROS_INFO_THROTTLE(5, "request goal pose in odom frame: x=%f, y=%f, theta=%f", req.goal.position.x, req.goal.position.y, tf::getYaw(req.goal.orientation) * 180 / M_PI);
+    ROS_INFO_THROTTLE(1, "request goal pose in planner ogm map: x=%f, y=%f, theta=%f", local_goal_pose.position.x, local_goal_pose.position.y, tf::getYaw(local_goal_pose.orientation) * 180 / M_PI);
 
     if(search_info_ptr->getMapSet()) {
         // reset receive_map flag considering time delay
@@ -109,7 +109,13 @@ bool localPlanCallback(iv_explore_msgs::GetAstarPlan::Request &req, iv_explore_m
                     tmp.poses[i].pose = astar::transformPose(tmp.poses[i].pose, world2map);
                     path_node.position.x = tmp.poses[i].pose.position.x;
                     path_node.position.y = tmp.poses[i].pose.position.y;
-                    path_node.velocity.linear.x = 1.5;
+                    path_node.velocity.linear.x = 3;
+
+                    if(i > tmp.poses.size() - 5 && i < tmp.poses.size() - 2)
+                        path_node.velocity.linear.x = 1;
+                    else if(i > tmp.poses.size() - 2)
+                        path_node.velocity.linear.x = 0;
+
                     trajectory.points.push_back(path_node);
                 }
 
@@ -177,7 +183,7 @@ int main(int argc, char **argv) {
     as_planner_ptr.reset(new astar_planner::AstarSearch());
     search_info_ptr.reset(new SearchInfo);
     tf_listener_ptr.reset(new tf::TransformListener);
-    private_nh_.param<std::string>("receive_planner_map_topic_name", receive_planner_map_topic_name, "/explore_entry_map");
+    private_nh_.param<std::string>("receive_planner_map_topic_name", receive_planner_map_topic_name, "/local_map");
     private_nh_.param<std::string>("global_map_frame_name", global_map_frame_name, "/odom");
     private_nh_.param<std::string>("local_map_frame_name", local_map_frame_name, "base_link");
     private_nh_.param<std::string>("abso_global_map_frame_name", abso_global_map_frame_name, "/abso_odom");
