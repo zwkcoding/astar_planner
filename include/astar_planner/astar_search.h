@@ -19,7 +19,8 @@
 #include <internal_grid_map/internal_grid_map.hpp>
 #include <car_model/car_geometry.hpp>
 #include <opt_utils/opt_utils.hpp>
-
+#include <r_s_planner/dubins.h>
+#include <r_s_planner/reeds_shepp.h>
 namespace astar_planner {
 
 class AstarSearch
@@ -27,7 +28,7 @@ class AstarSearch
  public:
   AstarSearch();
   ~AstarSearch();
-
+   void init(const nav_msgs::OccupancyGrid &map);
   //-- FOR DEBUG -------------------------
   void publishPoseArray(const ros::Publisher &pub, const std::string &frame);
   void publishFootPrint(const ros::Publisher &pub, const std::string &frame);
@@ -49,7 +50,8 @@ class AstarSearch
   void poseToIndex(const geometry_msgs::Pose &pose, int *index_x, int *index_y, int *index_theta);
   bool getOdomCoordinates(double &x, double &y, unsigned int ind_x, unsigned int ind_y);
   bool isOutOfRange(int index_x, int index_y);
-  void setPath(const SimpleNode &goal);
+  void setPath( const AstarNode *node);
+  void setPath( const AstarNode *node, std::vector<std::vector<double> >& db_path, double length);
 
   void updateGridMap(const nav_msgs::OccupancyGrid &map);
   void setMap(const nav_msgs::OccupancyGrid &map);
@@ -114,7 +116,9 @@ class AstarSearch
   double curve_weight_;
   double reverse_weight_;
   bool use_wavefront_heuristic_;
-
+  bool use_constrain_heuristic_;
+  bool use_euclidean_heuristic_;
+  bool use_both_heuristic_;
   bool node_initialized_;
   std::vector<std::vector<NodeUpdate>> state_update_table_;
   nav_msgs::MapMetaData map_info_;
@@ -155,9 +159,12 @@ class AstarSearch
   //  path replan parameters
   double offset_distance_;
   bool allow_use_last_path_;
+  bool allow_use_dubinshot_;
 
   int status_code_;
-
+  int  iterations_;
+  ReedsSheppStateSpace rs_planner;
+  DubinsStateSpace db_planner;
 
 
 

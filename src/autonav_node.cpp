@@ -72,6 +72,23 @@ int main(int argc, char **argv) {
     astar_runtime << "index" << "t" << hmpl::endrow;
     int runtime_counter = 0;
 #endif
+    std::string image_name;
+    private_nh_.param<std::string>("image_name", image_name, "large_U_obs.png");
+    std::string package_dir = ros::package::getPath("astar_planner");
+    std::string img_dir = "/images/" + image_name;
+    cv::Mat img_src = cv::imread(package_dir + img_dir, CV_8UC1);
+    double resolution = 0.2;  // in meter
+    hmpl::InternalGridMap in_gm;
+    // set the 2d position of the center point of grid map in the grid map frame
+    in_gm.initializeFromImage(img_src, resolution, grid_map::Position::Zero());
+    in_gm.addObstacleLayerFromImage(img_src, 0.5);
+    in_gm.updateDistanceLayer();
+    in_gm.maps.setFrameId("/odom");
+    ROS_INFO("Created map with size %f x %f m (%i x %i cells), map resolution is %f",
+             in_gm.maps.getLength().x(), in_gm.maps.getLength().y(),
+             in_gm.maps.getSize()(0), in_gm.maps.getSize()(1), in_gm.maps.getResolution());
+
+
 
     std::string map_topic, start_pose_topic, goal_pose_topic ;
     std::string se_result_global_path_send_topic;
@@ -98,36 +115,64 @@ int main(int argc, char **argv) {
 
     // ROS subscribers
     ros::Subscriber map_sub = n.subscribe(map_topic, 1, &SearchInfo::mapCallback, &search_info);
-    ros::Subscriber start_sub = n.subscribe(start_pose_topic, 1, &SearchInfo::currentPoseCallback, &search_info);
-    ros::Subscriber goal_sub  = n.subscribe(goal_pose_topic, 1, &SearchInfo::goalCallback, &search_info);
-
+    ros::Subscriber start_sub = n.subscribe("/initialpose", 1, &SearchInfo::startCallback, &search_info);
+    //ros::Subscriber start_sub = n.subscribe(start_pose_topic, 1, &SearchInfo::currentPoseCallback, &search_info);
+//    ros::Subscriber goal_sub  = n.subscribe(goal_pose_topic, 1, &SearchInfo::goalCallback, &search_info);
+    ros::Subscriber goal_sub  = n.subscribe("/move_base_simple/goal", 1, &SearchInfo::goalCallback, &search_info);
     // ROS publishers
     ros::Publisher path_pub = private_nh_.advertise<nav_msgs::Path>("global_path_show", 1, false);
     ros::Publisher trajectory_pub = n.advertise<control_msgs::Trajectory>(se_result_global_path_send_topic, 1, false);
     ros::Publisher debug_pose_pub = n.advertise<geometry_msgs::PoseArray>(node_name + "debug_pose_array", 1, false);
     ros::Publisher footprint_pub_ = n.advertise<visualization_msgs::MarkerArray>(node_name + "astar_footprint", 1, false);
-
+    // create map publisher
+    ros::Publisher map_publisher =
+            n.advertise<nav_msgs::OccupancyGrid>(map_topic, 1, true);
     tf::TransformListener tf_listener_;
     auto last_timestamp = std::chrono::system_clock::now();
+
+    geometry_msgs::Pose start_pose,goal_pose;
+    double yaw0, yaw1;
+    private_nh_.param<double>("s_x", start_pose.position.x, 15);
+    private_nh_.param<double>("s_y", start_pose.position.y, 70);
+    private_nh_.param<double>("s_z", yaw0, -86);
+    start_pose.orientation = tf::createQuaternionMsgFromYaw(yaw0 * M_PI / 180.0);
+    private_nh_.param<double>("g_x", goal_pose.position.x, 15);
+    private_nh_.param<double>("g_y", goal_pose.position.y, 23);
+    private_nh_.param<double>("g_z", yaw1, 90);
+    goal_pose.orientation = tf::createQuaternionMsgFromYaw(yaw1 * M_PI / 180.0);
+
     ros::Rate loop_rate(100);  // hz
     while (ros::ok()) {
         ros::spinOnce();
 
+        // Add data to grid map.
+        ros::Time time = ros::Time::now();
+        // publish the grid_map
+        in_gm.maps.setTimestamp(time.toNSec());
+        nav_msgs::OccupancyGrid message;
+        grid_map::GridMapRosConverter::toOccupancyGrid(
+                in_gm.maps, in_gm.obs, in_gm.FREE, in_gm.OCCUPY, message);
+        map_publisher.publish(message);
+
         // warn: path send hz depends on map/position msg hz
-        if (!search_info.getMapSet() || !search_info.getStartSet() || !search_info.getGoalSet()) {
+        if (!search_info.getMapSet() ) {
             loop_rate.sleep();
             continue;
         }
 
         // Reset flag : update current start pose and map env
-        search_info.reset();
+//        search_info.reset();
 
         // new next goal received and not reached
         if(false == search_info.goal_update_flag_) {
             auto start = std::chrono::system_clock::now();
             // Execute astar search
-            bool result = astar.makePlan(search_info.getStartPose().pose, search_info.getGoalPose().pose,
-                                         search_info.getMap());
+            astar.init(search_info.getMap());
+            if(search_info.getStartSet())
+                start_pose = search_info.getStartPose().pose;
+            if(search_info.getGoalSet())
+                goal_pose = search_info.getGoalPose().pose;
+            bool result = astar.makePlan(start_pose, goal_pose, search_info.getMap());
 
             auto end = std::chrono::system_clock::now();
             auto msec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000.0;
@@ -142,7 +187,8 @@ int main(int argc, char **argv) {
                 // convert msg : from path to traj
                 path_pub.publish(astar.getPath());
                 nav_msgs::Path tmp = astar.getPath();  // use path, not sampled arc
-                control_msgs::Traj_Node path_node;
+                saveStatePath(astar.getPath());
+      /*          control_msgs::Traj_Node path_node;
                 control_msgs::Trajectory trajectory;
 #ifndef CONTROL_LOCAL_PATH
 
@@ -205,11 +251,11 @@ int main(int argc, char **argv) {
 
 #endif
 
-                trajectory_pub.publish(trajectory);
+                trajectory_pub.publish(trajectory);*/
 #if DEBUG
                 auto time = std::chrono::system_clock::now();
                 auto msec = std::chrono::duration_cast<std::chrono::microseconds>(time - last_timestamp).count() / 1000.0;
-                ROS_INFO_THROTTLE(1, "control_msg send period: %lf[msec]", msec);
+//                ROS_INFO_THROTTLE(1, "control_msg send period: %lf[msec]", msec);
                 last_timestamp = time;
 #endif
 
@@ -233,6 +279,8 @@ int main(int argc, char **argv) {
                 }
                 search_info.goal_update_flag_ = true;
                 search_info.resetGoalFlag(); // enable receive new goal
+
+                astar.publishPoseArray(debug_pose_pub, global_map_frame_name);
 
             }
         } else {

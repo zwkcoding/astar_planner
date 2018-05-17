@@ -82,7 +82,10 @@ void SearchInfo::startCallback(const geometry_msgs::PoseWithCovarianceStampedCon
 
   start_pose_local_.header.stamp = ros::Time::now();
   start_pose_local_.header.frame_id = planner_map_frame_name_;
-  
+
+  double yaw = tf::getYaw(start_pose_local_.pose.orientation);
+  ROS_INFO_THROTTLE(0.5, "search start cell[in planner_map coord] : [%f[m], %f[m], %f[degree]]", start_pose_local_.pose.position.x,
+                    start_pose_local_.pose.position.y, yaw * 180 / M_PI);
   start_set_ = true;
 }
 
@@ -178,6 +181,9 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   } else{
     // keep last goal
     goal_pose_local_ = last_goal_pose_local_;
+      goal_pose_local_.pose = astar::transformPose(goal_pose_global_.pose, ogm2map_);
+      goal_pose_local_.header.stamp = ros::Time::now();
+      goal_pose_local_.header.frame_id =  planner_map_frame_name_;
   }
 #else
     if(last_goal_pose_local_.header.frame_id.empty() || goal_update_flag_ == true) {
@@ -198,7 +204,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 
 void SearchInfo::reset()
 {
-    ros::WallTime end = ros::WallTime::now();
+    /*ros::WallTime end = ros::WallTime::now();
     double map_elapse_time = (end - last_receive_map_timestamp_).toSec() * 1000;
     double position_elapse_time = (end - last_receive_position_timestamp_).toSec() * 1000;
     double goal_elapse_time = (end - last_receive_goal_timestamp_).toSec() * 1000;
@@ -220,9 +226,10 @@ void SearchInfo::reset()
 #ifdef PLAN_IN_LOCAL_MAP
         goal_set_  = false;
         ROS_ERROR("Receive goal position delay exceed time!");
-#endif
-    }
-
+#endif*/
+    map_set_   = true;
+    start_set_ = true;
+    goal_set_ = true;
 
 }
 

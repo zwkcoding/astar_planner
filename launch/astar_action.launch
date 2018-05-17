@@ -9,21 +9,21 @@
 <arg name="abso_global_map_frame_name" value="/abso_odom"/>
 <arg name="allow_time_transmission_delay_ms_" value="1000"/>
 
-<!-- mkz
+<!-- mkz -->
 <arg name="robot_length" value="4.93"/>
 <arg name="robot_width" value="2.45"/>
 <arg name="robot_wheelbase" value="2.85"/>
 <arg name="base2back" value="1.100"/>
 <arg name="minimum_turning_radius" value="5.5"/>
--->
 
-<!-- toyata　-->
+
+<!-- toyata　
 <arg name="robot_length" value="4.9"/>
 <arg name="robot_width" value="1.95"/>
 <arg name="robot_wheelbase" value="2.86"/>
 <arg name="base2back" value="1.0"/>
 <arg name="minimum_turning_radius" value="5"/>
-
+-->
 
 <!-- private param for explore_large_map_pkg : /global_map,/explore_entry_map ; /move_base_simple/goal, /local_search_goal /-->
 <arg name="re_planner_map_topic_name" value="/global_map"/>

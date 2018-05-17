@@ -19,6 +19,7 @@
   <depend>grid_map_ros</depend>
   <depend>car_model</depend>
   <depend>iv_explore_msgs</depend>
+  <depend>r_s_planner</depend>
   <export>
   </export>
 </package>

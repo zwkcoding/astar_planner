@@ -54,7 +54,6 @@
         <param name="allow_offset_distance" value="2" />
       </node>
 
-       <node pkg="rviz" type="rviz" name="rviz" args="-d $(find sas_space_explore)/rviz/sas_explore_node_viz.rviz"/>
        <node pkg="rqt_reconfigure"  type="rqt_reconfigure" name="reconfigure_gui"/>
        <node pkg="dynamic_reconfigure" type="dynparam" name="dynparam" args="load /get_plan_server_node $(find sas_space_explore)/cfg/dynamic_params.yaml"/>
 

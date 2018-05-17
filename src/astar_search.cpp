@@ -1,32 +1,42 @@
 #include "astar_planner/astar_search.h"
 #include <unistd.h>  // usleep
+
+static const int iterations = 30000;
+
 namespace astar_planner {
 
     AstarSearch::AstarSearch() : node_initialized_(false) {
 
         ros::NodeHandle private_nh_("~");
         private_nh_.param<std::string>("path_frame", path_frame_, "/odom");
-        private_nh_.param<bool>("allow_use_last_path", allow_use_last_path_, true);
+        private_nh_.param<bool>("allow_use_last_path", allow_use_last_path_, false);
+        private_nh_.param<bool>("allow_use_dubinshot", allow_use_dubinshot_, true);
         private_nh_.param<bool>("use_back", use_back_, true);
-        private_nh_.param<int>("angle_size", angle_size_, 48);
+        private_nh_.param<int>("angle_size", angle_size_, 32);
         private_nh_.param<double>("minimum_turning_radius", minimum_turning_radius_, 5);
         private_nh_.param<int>("obstacle_threshold", obstacle_threshold_, 70);
-        private_nh_.param<double>("goal_radius", goal_radius_, 2);
+        private_nh_.param<double>("goal_radius", goal_radius_, 1);
         private_nh_.param<double>("goal_angle", goal_angle_, 10.0); // unit: degree
         private_nh_.param<double>("robot_length", robot_length_, 4.9);
         private_nh_.param<double>("robot_wheelbase", robot_wheelbase_, 2.84);
-        private_nh_.param<double>("robot_width", robot_width_, 2.8);
+        private_nh_.param<double>("robot_width", robot_width_, 2.45);
         private_nh_.param<double>("base2back", base2back_, 1.09);
         private_nh_.param<double>("curve_weight", curve_weight_, 1.05);
         private_nh_.param<double>("reverse_weight", reverse_weight_, 2.00);
-        private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, true);
+        private_nh_.param<bool>("use_euclidean_heuristic", use_euclidean_heuristic_, false);
+        private_nh_.param<bool>("use_wavefront_heuristic", use_wavefront_heuristic_, false);
+        private_nh_.param<bool>("use_constrain_heuristic", use_constrain_heuristic_, true);
+        private_nh_.param<bool>("use_both_heuristic", use_both_heuristic_, false);
         private_nh_.param<double>("allow_offset_distance", offset_distance_, 2);
+        private_nh_.param<int>("max_iterations", iterations_, 80000);
 
         // initial car geometry parameters
         InitCarGeometry(car_);
         // product motion primitive look-up table
         createStateUpdateTable(angle_size_);
 
+        rs_planner.setMinRadius(minimum_turning_radius_);
+        db_planner.setMinRadius(minimum_turning_radius_);
 
 
     }
@@ -172,15 +182,74 @@ namespace astar_planner {
 
         return false;
     }
+    void AstarSearch::setPath( const AstarNode *node, std::vector<std::vector<double> >& db_path, double length) {
+        std_msgs::Header header;
+        header.stamp = ros::Time::now();
+        header.frame_id = path_frame_;
+        path_.header = header;
 
-    void AstarSearch::setPath(const SimpleNode &goal) {
+        while (node != nullptr) {
+            tf::Vector3 origin(node->x, node->y, 0);
+            tf::Pose tf_pose;
+            tf_pose.setOrigin(origin);
+            tf_pose.setRotation(tf::createQuaternionFromYaw(node->theta));
+
+            // Transform path to global frame
+            tf_pose = map2ogm_ * tf_pose;
+
+            // normalize quaternion
+            tf::Quaternion q = tf_pose.getRotation().normalize();
+            tf_pose.setRotation(q);
+
+            // Set path as ros message
+            geometry_msgs::PoseStamped ros_pose;
+            tf::poseTFToMsg(tf_pose, ros_pose.pose);
+            ros_pose.header = header;
+            // use pose.position.z to represent back or forward
+            // -1 --> back; 1 --> forward
+            if (true == node->back) {
+                ros_pose.pose.position.z = -1;
+            } else {
+                ros_pose.pose.position.z = 1;
+            }
+
+            path_.poses.push_back(ros_pose);
+
+                        // To the next node
+            node = node->parent;
+        }
+        std::reverse(path_.poses.begin(), path_.poses.end());
+        // adjust first node direciton
+        if( -1 == path_.poses[1].pose.position.z) {
+            path_.poses[0].pose.position.z = -1;
+        }
+
+        double step = minimum_turning_radius_ * (2.0 * M_PI / angle_size_);
+        int node_num = path_.poses.size();
+        double path_length = step * node_num + length;
+        ROS_INFO("Path_Length: %f", path_length);
+
+        for (auto &point_itr : db_path) {
+            geometry_msgs::PoseStamped ros_pose;
+            ros_pose.header = header;
+            ros_pose.pose.position.x = point_itr[0];
+            ros_pose.pose.position.y = point_itr[1];
+            ros_pose.pose.position.z = 1;
+            ros_pose.pose.orientation = tf::createQuaternionMsgFromYaw(astar::modifyTheta(point_itr[2]));
+            path_.poses.push_back(ros_pose);
+        }
+
+
+    }
+
+    void AstarSearch::setPath(const AstarNode *node) {
         std_msgs::Header header;
         header.stamp = ros::Time::now();
         header.frame_id = path_frame_;
         path_.header = header;
 
         // From the goal node to the start node
-        AstarNode *node = &nodes_[goal.index_y][goal.index_x][goal.index_theta];
+//        AstarNode *node = &nodes_[goal.index_y][goal.index_x][goal.index_theta];
 
         // clear last result path in local frame
         local_path_.clear();
@@ -223,6 +292,11 @@ namespace astar_planner {
             node = node->parent;
 
         }
+
+        double step = minimum_turning_radius_ * (2.0 * M_PI / angle_size_);
+        int node_num = path_.poses.size();
+        double path_length = step * node_num;
+        ROS_INFO("Path_Length: %f", path_length);
 
         // Reverse the vector to be start to goal order
         std::reverse(path_.poses.begin(), path_.poses.end());
@@ -718,12 +792,6 @@ namespace astar_planner {
         geometry_msgs::Pose ogm_in_map = astar::transformPose(map_info_.origin, map2ogm_frame);
         tf::poseMsgToTF(ogm_in_map, map2ogm_);
 
-        // Initialize node according to map size
-        // time-costy for first time!
-        if (!node_initialized_) {
-            resizeNode(map.info.width, map.info.height, angle_size_);
-            node_initialized_ = true;
-        }
 
         for (size_t i = 0; i < map.info.height; i++) {
             for (size_t j = 0; j < map.info.width; j++) {
@@ -801,7 +869,7 @@ namespace astar_planner {
         start_node.gc = 0;
         start_node.back = false;
         start_node.status = STATUS::OPEN;
-        if (!use_wavefront_heuristic_)
+        if (use_euclidean_heuristic_)
             start_node.hc = astar::calcDistance(start_pose_local_.pose.position.x, start_pose_local_.pose.position.y,
                                                 goal_pose_local_.pose.position.x, goal_pose_local_.pose.position.y);
 
@@ -860,7 +928,7 @@ namespace astar_planner {
 //  }
 
         // Calculate wavefront heuristic cost
-        if (use_wavefront_heuristic_) {
+        if (use_wavefront_heuristic_ || use_both_heuristic_) {
             auto start = std::chrono::system_clock::now();
             bool wavefront_result = calcWaveFrontHeuristic(goal_sn);
             auto end = std::chrono::system_clock::now();
@@ -879,24 +947,63 @@ namespace astar_planner {
         // -- Start Astar search ----------
         // If the openlist is empty, search failed
         ros::WallTime begin = ros::WallTime::now();
+        int expand_nums = 0;
+        double goal_state[3] = {goal_pose_local_.pose.position.x + map_info_.origin.position.x,
+                                goal_pose_local_.pose.position.y + map_info_.origin.position.y,
+                                astar::modifyTheta(tf::getYaw(goal_pose_local_.pose.orientation))};
+        static double one_angle_range = 2 * M_PI / angle_size_;
+
         while (!openlist_.empty()) {
 
             // Terminate the search if the count reaches a certain value
             ros::WallTime end = ros::WallTime::now();
             float elapse_time = (end - begin).toSec() * 1000;
-            if (elapse_time > 200) {
+ /*           if (elapse_time > 200) {
                 ROS_WARN("Astar Exceed time limit in search");
                 return false;
-            }
+            }*/
+
 
             // Pop minimum cost node from openlist
             SimpleNode sn;
             sn = openlist_.top();
             openlist_.pop();
             nodes_[sn.index_y][sn.index_x][sn.index_theta].status = STATUS::CLOSED;
-
+            expand_nums ++;
             // Expand include from this node
             AstarNode *current_node = &nodes_[sn.index_y][sn.index_x][sn.index_theta];
+
+            // SEARCH WITH DUBINS SHOT
+            if(allow_use_dubinshot_) {
+                double start_state[3] = {current_node->x + map_info_.origin.position.x,
+                                         current_node->y + map_info_.origin.position.y,
+                                         current_node->theta};
+                double length = -1;
+                double step_size = 0.5;
+                std::vector<std::vector<double> > db_path;
+                rs_planner.sample(start_state, goal_state, step_size, length, db_path);
+                std::vector<hmpl::State> path;
+                for (auto &point_itr : db_path) {
+                    hmpl::State state;
+                    state.x = point_itr[0];
+                    state.y = point_itr[1];
+                    state.z = point_itr[2];
+                    path.push_back(state);
+                }
+                if(isSinglePathCollisionFreeImproved(path)) {
+//                    for (int i = 0; i < db_path.size(); i++) {
+//                        AstarNode tmp;
+//                        tmp.x = db_path[i][0] - map_info_.origin.position.x;
+//                        tmp.y = db_path[i][1] - map_info_.origin.position.y;
+//                        tmp.theta = astar::modifyTheta(db_path[i][2]);
+//                    }
+                    setPath(current_node, db_path, length);
+                    ROS_INFO("Expand node number: %d",expand_nums);
+                    return true;
+                }
+            }
+
+            // SEARCH WITH FORWARD SIMULATION
 
             // for each update
             for (const auto &state : state_update_table_[sn.index_theta]) {
@@ -947,12 +1054,40 @@ namespace astar_planner {
                 double next_hc = nodes_[next.index_y][next.index_x][0].hc;
 
                 // Calculate euclid distance heuristic cost
-                if (!use_wavefront_heuristic_)
+                if (use_euclidean_heuristic_)
                     next_hc = astar::calcDistance(next_x, next_y, goal_pose_local_.pose.position.x,
                                                   goal_pose_local_.pose.position.y);
+                if (use_constrain_heuristic_ || use_both_heuristic_) {
+                    double start_state[3] = {next_x + map_info_.origin.position.x,
+                                             next_y + map_info_.origin.position.y,
+                                             next_theta};
+                    double length = -1;
+                    double step_size = 0.5;
+                    std::vector<std::vector<double> > path;
+//                    if(use_back_) {
+//                        rs_planner.sample(start_state, goal_state, step_size, length, path);
+//                    } else {
+//                        db_planner.sample(start_state, goal_state, step_size, length, path);
+//                    }
+                    rs_planner.sample(start_state, goal_state, step_size, length, path);
+                    double dis = astar::calcDistance(next_x, next_y, goal_pose_local_.pose.position.x,
+                                        goal_pose_local_.pose.position.y);
+                    if(use_both_heuristic_) {
+                        next_hc = std::max(length, next_hc);
+//                        if(dis < 10)
+//                          next_hc = length;
+//                        else
+//                            ;
+
+                    } else {
+                        next_hc = length;
+                    }
+
+                }
+
 
                 // GOAL CHECK
-                if (isGoal(next_x, next_y, next_theta)) {
+                if (isGoal(next_x, next_y, next_theta) || expand_nums > iterations_) {
                     next_node->status = STATUS::OPEN;
                     next_node->x = next_x;
                     next_node->y = next_y;
@@ -961,8 +1096,8 @@ namespace astar_planner {
                     next_node->hc = next_hc;
                     next_node->back = state.back;
                     next_node->parent = current_node;
-
-                    setPath(next);
+                    setPath(next_node);
+                    ROS_INFO("Expand node number: %d",expand_nums);
                     return true;
                 }
 
@@ -1041,7 +1176,7 @@ namespace astar_planner {
                     path_ = last_path_;
                     return true;
                 } else {
-                    ROS_INFO("Fail to use last path : collision or far away path");
+//                    ROS_INFO("Fail to use last path : collision or far away path");
                     replan = true;
                 }
             } else {
@@ -1086,14 +1221,14 @@ namespace astar_planner {
         ROS_DEBUG("map update cost time[ms]:%f ", usec / 1000.0);
 
         if (!setStartNode()) {
-            ROS_WARN("Invalid start pose!");
+            ROS_WARN_THROTTLE(5, "Invalid start pose!");
             status_code_ = 1;
             last_result = false;
             return false;
         }
 
         if (!setGoalNode()) {
-            ROS_WARN("Invalid goal pose!");
+            ROS_WARN_THROTTLE(5,"Invalid goal pose!");
             status_code_ = 2;
             last_result = false;
             return false;
@@ -1101,12 +1236,12 @@ namespace astar_planner {
 
         ros::WallTime end0 = ros::WallTime::now();
         float elapse_time = (end0 - begin).toSec() * 1000;
-        if (elapse_time > 500) {
+       /* if (elapse_time > 500) {
             ROS_WARN("Astar search Exceed time limit");
             status_code_ = 3;
             last_result = false;
             return false;
-        }
+        }*/
 
 
 //        start = std::chrono::system_clock::now();
@@ -1392,6 +1527,15 @@ namespace astar_planner {
 
     }
 
+    void AstarSearch::init(const nav_msgs::OccupancyGrid &map) {
+    // Initialize node according to map size
+    // time-costy for first time!
+        if (!node_initialized_) {
+        resizeNode(map.info.width, map.info.height, angle_size_);
+        node_initialized_ = true;
+        }
+
+    }
 
 
 }

@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
         grid_map_ros
         car_model
         iv_explore_msgs
+        r_s_planner
         )
 find_package(OpenCV REQUIRED)
 
@@ -25,7 +26,7 @@ find_package(OpenCV REQUIRED)
 ## catkin specific configuration ##
 ###################################
 catkin_package(
-        LIBRARIES hybrid_astar
+        LIBRARIES ${PROJECT_NAME}
         CATKIN_DEPENDS roscpp std_msgs tf opt_utils internal_grid_map visualization_msgs car_model iv_explore_msgs
         DEPENDS OpenCV
 )

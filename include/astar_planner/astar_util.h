@@ -3,7 +3,7 @@
 
 #include <tf/transform_listener.h>
 
-//#define CONTROL_LOCAL_PATH
+#define CONTROL_LOCAL_PATH
 //#define PLAN_IN_LOCAL_MAP
 #define DEBUG 1
 
