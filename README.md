@@ -1,4 +1,4 @@
-_# astar_planner
+# astar_planner
 Hybrid A* planner.
 
 ## Overview
